@@ -1,16 +1,15 @@
 # Helps converting hints.ini into POT
 
 import sys
-
 from configparser import ConfigParser
 from pathlib import Path
 
 
 def write_to_pot(path: Path, data: dict[str, str]):
-    with open(path, "a+t") as pot_file:
-        for key in data.keys():
+    with open(path, "a+") as pot_file:
+        for key in data:
             print(
-                f"\n#: resources/data/hints.ini: [{ key }]\nmsgid \"{ data[key]['text'] }\"\nmsgstr \"\"",
+                f'\n#: resources/data/hints.ini: [{key}]\nmsgid "{data[key]["text"]}"\nmsgstr ""',
                 file=pot_file,
             )
 

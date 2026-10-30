@@ -19,6 +19,7 @@ its close button or from the page.
   page   --orca.close()-->                            panel closes, plugin.on_close()
   plugin --panel.post({command: 'objects', ...})-->   page (orca.onMessage)
 """
+
 import orca
 
 PAGE = """

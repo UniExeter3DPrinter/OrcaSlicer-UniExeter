@@ -36,17 +36,18 @@ The first layer is skipped by default for bed adhesion (like the built-in
 fuzzy_skin_first_layer = off). No numpy required; for very dense models the
 Polygon.as_array()/set_points numpy path would be the faster route.
 """
+
+import json
 import math
 import random
-import json
 
 import orca
 
 _DEFAULTS = {
-    "thickness_mm":      0.3,   # max normal displacement (built-in fuzzy_skin_thickness default)
-    "point_distance_mm": 0.8,   # target resample spacing (built-in fuzzy_skin_point_dist default)
-    "fuzz_holes":        1.0,   # nonzero: jitter hole rings too, not just the outer contour
-    "skip_first_layer":  1.0,   # nonzero: keep layer 0 crisp for bed adhesion
+    "thickness_mm": 0.3,  # max normal displacement (built-in fuzzy_skin_thickness default)
+    "point_distance_mm": 0.8,  # target resample spacing (built-in fuzzy_skin_point_dist default)
+    "fuzz_holes": 1.0,  # nonzero: jitter hole rings too, not just the outer contour
+    "skip_first_layer": 1.0,  # nonzero: keep layer 0 crisp for bed adhesion
 }
 
 
@@ -89,8 +90,7 @@ def _fuzz_ring(points, thickness, min_dist, rand_range, rng):
             while d < seg:
                 t = d / seg
                 r = (rng.random() * 2.0 - 1.0) * thickness
-                out.append((p0x + dx * t - dy / seg * r,
-                            p0y + dy * t + dx / seg * r))
+                out.append((p0x + dx * t - dy / seg * r, p0y + dy * t + dx / seg * r))
                 d += min_dist + rng.random() * rand_range
             dist_left_over = d - seg  # carry the remainder into the next segment
         p0x, p0y = p1x, p1y
@@ -165,7 +165,8 @@ class FuzzySlices(orca.slicing.SlicingPipelineCapabilityBase):
 
         return orca.ExecutionResult.success(
             f"Fuzzy Slices: fuzzed {rings} ring(s) on {layers_touched} layer(s) "
-            f"(+/-{p['thickness_mm']} mm @ {p['point_distance_mm']} mm)")
+            f"(+/-{p['thickness_mm']} mm @ {p['point_distance_mm']} mm)"
+        )
 
 
 @orca.plugin

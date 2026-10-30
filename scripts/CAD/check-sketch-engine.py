@@ -20,7 +20,11 @@ Entirely 2D: sketch entities only, no extrude, revolve or any solid feature.
 
 Exit 0 = every rung held. Otherwise the first broken property is named and the run stops.
 """
-import json, math, socket, sys
+
+import json
+import math
+import socket
+import sys
 
 SOCK = sys.argv[1] if len(sys.argv) > 1 else "/tmp/mcp.sock"
 EPS = 1e-9
@@ -34,8 +38,7 @@ def call(method, **params):
     s = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
     s.settimeout(30)
     s.connect(SOCK)
-    s.sendall((json.dumps({"jsonrpc": "2.0", "id": _n, "method": method,
-                           "params": params}) + "\n").encode())
+    s.sendall((json.dumps({"jsonrpc": "2.0", "id": _n, "method": method, "params": params}) + "\n").encode())
     buf = b""
     while b"\n" not in buf:
         d = s.recv(65536)
@@ -111,7 +114,7 @@ def tangent_at_point(e, p):
         t = tangent(e, False)
         return t
     t = tangent(e, True)
-    return (-t[0], -t[1])          # leaving p1 means going back along the curve
+    return (-t[0], -t[1])  # leaving p1 means going back along the curve
 
 
 def smooth(e1, e2, p):
@@ -122,9 +125,11 @@ def smooth(e1, e2, p):
 
 
 def closed_one_loop(r, voids=0):
-    return (r["buildable"] and r["open_ends"] == []
-            and len([l for l in r["closed_loops"] if not any(
-                i in h["holes"] for h in r["closed_loops"] for i in [])]) >= 1)
+    return (
+        r["buildable"]
+        and r["open_ends"] == []
+        and len([l for l in r["closed_loops"] if not any(i in h["holes"] for h in r["closed_loops"] for i in [])]) >= 1
+    )
 
 
 def outer_loop(r):
@@ -146,8 +151,7 @@ got = set()
 for e in es:
     got.add(tuple(e["p0"]))
     got.add(tuple(e["p1"]))
-check("VERTEX", all(any(pt_near(c, g) for g in got) for c in corners),
-      f"all four corners exactly where asked {sorted(corners)}")
+check("VERTEX", all(any(pt_near(c, g) for g in got) for c in corners), f"all four corners exactly where asked {sorted(corners)}")
 lens = sorted(round(e["length"], 9) for e in es)
 check("LENGTH", lens == sorted([W, W, H, H]), f"sides are {W}/{H} twice each (got {lens})")
 # right angles: consecutive sides meet at 90 degrees
@@ -177,21 +181,21 @@ check("CLOSED", r["buildable"] and r["open_ends"] == [], "still closed with the 
 print("\nRUNG 3 — stadium: straights running into caps, tangent at every junction")
 fresh()
 L, R = 50.0, 15.0
-call("sketch_add", entities=[
-    {"type": "line", "p0": [-L, -R], "p1": [L, -R]},
-    {"type": "arc", "center": [L, 0], "radius": R,
-     "start_angle": -math.pi / 2, "end_angle": math.pi / 2},
-    {"type": "line", "p0": [L, R], "p1": [-L, R]},
-    {"type": "arc", "center": [-L, 0], "radius": R,
-     "start_angle": math.pi / 2, "end_angle": 3 * math.pi / 2},
-])
+call(
+    "sketch_add",
+    entities=[
+        {"type": "line", "p0": [-L, -R], "p1": [L, -R]},
+        {"type": "arc", "center": [L, 0], "radius": R, "start_angle": -math.pi / 2, "end_angle": math.pi / 2},
+        {"type": "line", "p0": [L, R], "p1": [-L, R]},
+        {"type": "arc", "center": [-L, 0], "radius": R, "start_angle": math.pi / 2, "end_angle": 3 * math.pi / 2},
+    ],
+)
 r = rep()
 es = r["entities"]
 check("CLOSED", r["buildable"] and r["open_ends"] == [], "one closed loop, no free ends")
 arcs = [e for e in es if e["type"] == "arc"]
 check("ARC", all(near(a["radius"], R) for a in arcs), f"both caps exactly R={R}")
-check("LENGTH", all(near(e["length"], 2 * L) for e in es if e["type"] == "line"),
-      f"both straights exactly {2*L}")
+check("LENGTH", all(near(e["length"], 2 * L) for e in es if e["type"] == "line"), f"both straights exactly {2 * L}")
 # tangency at all four line/arc junctions
 tang = True
 for a in arcs:
@@ -206,14 +210,14 @@ print("\nRUNG 4 — mirror: the reflected half is the exact reflection")
 fresh()
 half = [
     {"type": "line", "p0": [0, -R], "p1": [L, -R]},
-    {"type": "arc", "center": [L, 0], "radius": R,
-     "start_angle": -math.pi / 2, "end_angle": math.pi / 2},
+    {"type": "arc", "center": [L, 0], "radius": R, "start_angle": -math.pi / 2, "end_angle": math.pi / 2},
     {"type": "line", "p0": [L, R], "p1": [0, R]},
 ]
 call("sketch_add", entities=half)
 r = rep()
-check("CLOSED", not r["buildable"] and len(r["open_ends"]) == 2,
-      f"half profile is correctly OPEN, both ends named {r['open_ends']}")
+check(
+    "CLOSED", not r["buildable"] and len(r["open_ends"]) == 2, f"half profile is correctly OPEN, both ends named {r['open_ends']}"
+)
 call("sketch_select", entities=[0, 1, 2])
 call("sketch_mirror", axis_a=[0, 0], axis_b=[0, 1])
 r = rep()
@@ -229,44 +233,44 @@ for e in es:
 sym = all(any(pt_near((-x, y), v) for v in allv) for (x, y) in src)
 check("SYMMETRY", sym, "every vertex has its exact mirror twin across x=0")
 mirrored_arc = [e for e in es[3:] if e["type"] == "arc"]
-check("ARC", mirrored_arc and near(mirrored_arc[0]["radius"], R)
-      and pt_near(tuple(mirrored_arc[0]["center"]), (-L, 0)),
-      f"mirrored cap keeps R={R} and lands at (-{L}, 0)")
+check(
+    "ARC",
+    mirrored_arc and near(mirrored_arc[0]["radius"], R) and pt_near(tuple(mirrored_arc[0]["center"]), (-L, 0)),
+    f"mirrored cap keeps R={R} and lands at (-{L}, 0)",
+)
 
 print("\nRUNG 5 — offset: every curve moves by exactly d, and it stays closed")
 d = 4.0
 call("sketch_select", entities=list(range(len(es))))
-call("sketch_offset", distance=-d)          # -d = outward for this CCW loop
+call("sketch_offset", distance=-d)  # -d = outward for this CCW loop
 r = rep()
-new = r["entities"][len(es):]
+new = r["entities"][len(es) :]
 check("CLOSED", r["buildable"] and r["open_ends"] == [], "offset result is closed")
 off_arcs = [e for e in new if e["type"] == "arc"]
-check("ARC", all(near(a["radius"], R + d) for a in off_arcs),
-      f"each cap radius grew by exactly {d} -> {R+d}")
+check("ARC", all(near(a["radius"], R + d) for a in off_arcs), f"each cap radius grew by exactly {d} -> {R + d}")
 off_lines = [e for e in new if e["type"] == "line"]
-check("VERTEX", all(near(abs(e["p0"][1]), R + d) for e in off_lines),
-      f"each straight moved out to |y| = {R+d} exactly")
+check("VERTEX", all(near(abs(e["p0"][1]), R + d) for e in off_lines), f"each straight moved out to |y| = {R + d} exactly")
 
 print("\nRUNG 6 — a gap is found by coordinate, then closed by a real constraint")
 fresh()
-call("sketch_add", entities=[
-    {"type": "line", "p0": [0, 0], "p1": [60, 0]},
-    {"type": "line", "p0": [60, 0], "p1": [60, 40]},
-    {"type": "line", "p0": [60, 40], "p1": [0, 40]},
-    {"type": "line", "p0": [0, 40], "p1": [0.35, 0]},      # 0.35 mm short
-])
+call(
+    "sketch_add",
+    entities=[
+        {"type": "line", "p0": [0, 0], "p1": [60, 0]},
+        {"type": "line", "p0": [60, 0], "p1": [60, 40]},
+        {"type": "line", "p0": [60, 40], "p1": [0, 40]},
+        {"type": "line", "p0": [0, 40], "p1": [0.35, 0]},  # 0.35 mm short
+    ],
+)
 r = call("sketch_validate", tolerance=1.0)
-check("CLOSED", not r["buildable"] and len(r["open_ends"]) == 2,
-      f"the gap is reported, both free ends named {r['open_ends']}")
+check("CLOSED", not r["buildable"] and len(r["open_ends"]) == 2, f"the gap is reported, both free ends named {r['open_ends']}")
 dof0 = r["dof"]
 r = call("sketch_heal", tolerance=1.0)
 check("CLOSED", r["buildable"] and r["open_ends"] == [], "healed into a closed loop")
 check("VERTEX", r["welded"] == 1, "exactly one pair of vertices welded")
-check("ANGLE", r["dof"] < dof0,
-      f"the weld is a real constraint, not a nudge: DoF {dof0} -> {r['dof']}")
+check("ANGLE", r["dof"] < dof0, f"the weld is a real constraint, not a nudge: DoF {dof0} -> {r['dof']}")
 es = ents()
-check("VERTEX", pt_near(tuple(es[3]["p1"]), tuple(es[0]["p0"])),
-      "the two ends are now the same point")
+check("VERTEX", pt_near(tuple(es[3]["p1"]), tuple(es[0]["p0"])), "the two ends are now the same point")
 
 print("\nRUNG 7 — the composite: mirrored, tangent, two voids, all at once")
 fresh()
@@ -282,9 +286,11 @@ check("CLOSED", r["buildable"] and r["open_ends"] == [], "one closed outer loop,
 check("CLOSED", len(out["holes"]) == 2, "it encloses exactly two voids")
 circles = [e for e in es if e["type"] == "circle"]
 check("ARC", all(near(c["radius"], 6) for c in circles), "both voids exactly R=6")
-check("SYMMETRY", pt_near(tuple(circles[0]["center"]), (-25, 0))
-      and pt_near(tuple(circles[1]["center"]), (25, 0)),
-      "the voids sit symmetrically at x = -25 and +25")
+check(
+    "SYMMETRY",
+    pt_near(tuple(circles[0]["center"]), (-25, 0)) and pt_near(tuple(circles[1]["center"]), (25, 0)),
+    "the voids sit symmetrically at x = -25 and +25",
+)
 tang = True
 for a in [e for e in es if e["type"] == "arc"]:
     for p in endpoints(a):
@@ -293,8 +299,7 @@ for a in [e for e in es if e["type"] == "arc"]:
                 tang = False
 check("TANGENT", tang, "every straight-to-cap junction is still smooth")
 exact = 2 * L * 2 * R + math.pi * R * R
-check("LENGTH", near(out["area"], exact, 1e-6),
-      f"cross-check: enclosed area {out['area']:.4f} = 2L*2R + pi*R^2 = {exact:.4f}")
+check("LENGTH", near(out["area"], exact, 1e-6), f"cross-check: enclosed area {out['area']:.4f} = 2L*2R + pi*R^2 = {exact:.4f}")
 
 print("\nRUNG 8 — a real drawing: StudyCadCam MPD5, the pin's revolve half-profile")
 # Ø27 x 95 pin: C1 chamfer on the left end, cylinder to a corner at x=85, an R5 fillet into a
@@ -302,21 +307,23 @@ print("\nRUNG 8 — a real drawing: StudyCadCam MPD5, the pin's revolve half-pro
 # reproducible: 85 is to the CORNER, 23 deg is to the AXIS, C1 is 1 x 45.
 fresh()
 RAD, LEN, TX, ANG, RF, CH = 13.5, 95.0, 85.0, math.radians(23), 5.0, 1.0
-t  = RF * math.tan(ANG / 2)
-ax, ay = TX - t, RAD                      # fillet tangent point on the cylinder
-cx, cy = ax, RAD - RF                     # fillet centre
-bx, by = TX + t * math.cos(-ANG), RAD + t * math.sin(-ANG)   # tangent point on the cone
-ey = by - (LEN - bx) * math.tan(ANG)      # where the cone meets the right face
-call("sketch_add", entities=[
-    {"type": "line", "p0": [0, 0],            "p1": [0, RAD - CH]},        # left face
-    {"type": "line", "p0": [0, RAD - CH],     "p1": [CH, RAD]},            # C1 chamfer
-    {"type": "line", "p0": [CH, RAD],         "p1": [ax, ay]},             # cylinder top
-    {"type": "arc",  "center": [cx, cy], "radius": RF,
-     "start_angle": math.pi / 2, "end_angle": math.pi / 2 - ANG},          # R5 fillet
-    {"type": "line", "p0": [bx, by],          "p1": [LEN, ey]},            # 23 deg cone
-    {"type": "line", "p0": [LEN, ey],         "p1": [LEN, 0]},             # right face
-    {"type": "line", "p0": [LEN, 0],          "p1": [0, 0]},               # axis
-])
+t = RF * math.tan(ANG / 2)
+ax, ay = TX - t, RAD  # fillet tangent point on the cylinder
+cx, cy = ax, RAD - RF  # fillet centre
+bx, by = TX + t * math.cos(-ANG), RAD + t * math.sin(-ANG)  # tangent point on the cone
+ey = by - (LEN - bx) * math.tan(ANG)  # where the cone meets the right face
+call(
+    "sketch_add",
+    entities=[
+        {"type": "line", "p0": [0, 0], "p1": [0, RAD - CH]},  # left face
+        {"type": "line", "p0": [0, RAD - CH], "p1": [CH, RAD]},  # C1 chamfer
+        {"type": "line", "p0": [CH, RAD], "p1": [ax, ay]},  # cylinder top
+        {"type": "arc", "center": [cx, cy], "radius": RF, "start_angle": math.pi / 2, "end_angle": math.pi / 2 - ANG},  # R5 fillet
+        {"type": "line", "p0": [bx, by], "p1": [LEN, ey]},  # 23 deg cone
+        {"type": "line", "p0": [LEN, ey], "p1": [LEN, 0]},  # right face
+        {"type": "line", "p0": [LEN, 0], "p1": [0, 0]},  # axis
+    ],
+)
 r = rep()
 es = r["entities"]
 check("CLOSED", r["buildable"] and r["open_ends"] == [], "the half-profile is one closed loop")
@@ -326,9 +333,11 @@ check("LENGTH", near(max(xs) - min(xs), LEN), f"overall length exactly {LEN} (th
 check("VERTEX", near(max(ys), RAD), f"outer radius exactly {RAD} (the dia 27)")
 fil = [e for e in es if e["type"] == "arc"][0]
 check("ARC", near(fil["radius"], RF), f"the corner fillet is exactly R{RF:g}")
-cone = [e for e in es if e["type"] == "line"
-        and not near(e["p0"][0], e["p1"][0]) and not near(e["p0"][1], e["p1"][1])
-        and e["length"] > 5]
+cone = [
+    e
+    for e in es
+    if e["type"] == "line" and not near(e["p0"][0], e["p1"][0]) and not near(e["p0"][1], e["p1"][1]) and e["length"] > 5
+]
 if cone:
     c0 = cone[0]
     a = abs(math.degrees(math.atan2(c0["p1"][1] - c0["p0"][1], c0["p1"][0] - c0["p0"][0])))
@@ -347,6 +356,6 @@ call("sketch_cancel")
 try:
     call("sketch_cancel")
 except Exception:
-    pass                      # a rung may have closed it already
+    pass  # a rung may have closed it already
 print(f"\n{'ALL RUNGS HELD' if _fail == 0 else str(_fail) + ' CHECK(S) FAILED'}")
 sys.exit(1 if _fail else 0)

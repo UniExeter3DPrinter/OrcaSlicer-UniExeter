@@ -81,8 +81,13 @@ def bbox_dict(bb):
     """host.BoundingBox -> dict (or None when the box is undefined)."""
     if not bb.defined:
         return None
-    return {"min": vec(bb.min), "max": vec(bb.max), "size": vec(bb.size),
-            "center": vec(bb.center), "radius": round(float(bb.radius), 4)}
+    return {
+        "min": vec(bb.min),
+        "max": vec(bb.max),
+        "size": vec(bb.size),
+        "center": vec(bb.center),
+        "radius": round(float(bb.radius), 4),
+    }
 
 
 def enum_name(value):
@@ -91,8 +96,7 @@ def enum_name(value):
 
 def config_rows(keys, get_value):
     """Sorted [{k, v}] for a config; None values become ''. Complete, not sampled."""
-    return [{"k": k, "v": "" if (v := get_value(k)) is None else str(v)}
-            for k in sorted(keys)]
+    return [{"k": k, "v": "" if (v := get_value(k)) is None else str(v)} for k in sorted(keys)]
 
 
 def preset_dict(preset):
@@ -133,11 +137,15 @@ def filament_slots(bundle):
     cfg = bundle.full_config_value
     colors = split_config_list(cfg("filament_colour"))
     types = split_config_list(cfg("filament_type"))
-    return [{"slot": i + 1,
-             "color": colors[i] if i < len(colors) else "",
-             "material": types[i] if i < len(types) else "",
-             "preset": preset_dict(preset) if preset else None}
-            for i, preset in enumerate(bundle.current_filament_presets())]
+    return [
+        {
+            "slot": i + 1,
+            "color": colors[i] if i < len(colors) else "",
+            "material": types[i] if i < len(types) else "",
+            "preset": preset_dict(preset) if preset else None,
+        }
+        for i, preset in enumerate(bundle.current_filament_presets())
+    ]
 
 
 def build_overview():
@@ -177,19 +185,23 @@ def build_overview():
             "multimaterial": model.is_mm_painted(),
             "fuzzy_skin": model.is_fuzzy_skin_painted(),
         },
-        "design": {"designer": model.designer(), "design_id": model.design_id(),
-                   "model_id": model.id()},
+        "design": {"designer": model.designer(), "design_id": model.design_id(), "model_id": model.id()},
         "setup": {
-            "printer": {"name": printer.name, "is_system": printer.is_system,
-                        "is_dirty": printer.is_dirty},
-            "process": {"name": process.name, "is_system": process.is_system,
-                        "is_dirty": process.is_dirty},
+            "printer": {"name": printer.name, "is_system": printer.is_system, "is_dirty": printer.is_dirty},
+            "process": {"name": process.name, "is_system": process.is_system, "is_dirty": process.is_dirty},
             "filaments": filaments,
-            "highlights": [{"k": key, "v": str(cfg(key))}
-                           for key in ("printer_model", "nozzle_diameter",
-                                       "printable_height", "layer_height",
-                                       "sparse_infill_density", "enable_prime_tower")
-                           if cfg(key) is not None],
+            "highlights": [
+                {"k": key, "v": str(cfg(key))}
+                for key in (
+                    "printer_model",
+                    "nozzle_diameter",
+                    "printable_height",
+                    "layer_height",
+                    "sparse_infill_density",
+                    "enable_prime_tower",
+                )
+                if cfg(key) is not None
+            ],
         },
     }
 
@@ -213,19 +225,20 @@ def build_presets():
         selected_name = coll.selected_preset_name()
         shown = names[:MAX_PRESET_NAMES]
         if selected_name and selected_name not in shown:
-            shown.insert(0, selected_name)   # the active preset stays pickable past the cap
-        collections.append({
-            "key": attr,
-            "label": label,
-            "size": coll.size(),
-            "selected_name": selected_name,
-            # selected = as saved on disk; edited = selected + unsaved modifications
-            "selected": {"name": selected.name, "is_dirty": selected.is_dirty,
-                         "config_key_count": len(selected.config_keys())},
-            "edited": preset_dict(coll.edited_preset()),
-            "names": shown,
-            "truncated": max(0, len(names) - MAX_PRESET_NAMES),
-        })
+            shown.insert(0, selected_name)  # the active preset stays pickable past the cap
+        collections.append(
+            {
+                "key": attr,
+                "label": label,
+                "size": coll.size(),
+                "selected_name": selected_name,
+                # selected = as saved on disk; edited = selected + unsaved modifications
+                "selected": {"name": selected.name, "is_dirty": selected.is_dirty, "config_key_count": len(selected.config_keys())},
+                "edited": preset_dict(coll.edited_preset()),
+                "names": shown,
+                "truncated": max(0, len(names) - MAX_PRESET_NAMES),
+            }
+        )
     return {
         "collections": collections,
         "filament_slots": filament_slots(bundle),
@@ -261,19 +274,21 @@ def volume_dict(index, volume):
             "support_enforcer": volume.is_support_enforcer(),
             "support_blocker": volume.is_support_blocker(),
         },
-        "extruder": volume.extruder_id(),      # 1-based; -1 = none/inherited
+        "extruder": volume.extruder_id(),  # 1-based; -1 = none/inherited
         "offset": vec(volume.offset()),
-        "rotation": vec(volume.rotation()),    # radians
+        "rotation": vec(volume.rotation()),  # radians
         "scale": vec(volume.scaling_factor()),
         "mirror": vec(volume.mirror()),
         "facets": volume.facets_count(),
         "volume_mm3": round(float(volume.volume()), 3),
         "manifold": volume.is_manifold(),
         "mesh_errors": volume.mesh_errors_count(),
-        "painted": {"support": volume.is_fdm_support_painted(),
-                    "seam": volume.is_seam_painted(),
-                    "multimaterial": volume.is_mm_painted(),
-                    "fuzzy_skin": volume.is_fuzzy_skin_painted()},
+        "painted": {
+            "support": volume.is_fdm_support_painted(),
+            "seam": volume.is_seam_painted(),
+            "multimaterial": volume.is_mm_painted(),
+            "fuzzy_skin": volume.is_fuzzy_skin_painted(),
+        },
         "bbox": bbox_dict(volume.bounding_box()),
         "config": config_rows(volume.config_keys(), volume.config_value),
     }
@@ -288,7 +303,7 @@ def assemble_dict(instance):
         "available": True,
         "initialized": instance.is_assemble_initialized(),
         "offset": vec(instance.assemble_offset()),
-        "rotation": vec(instance.assemble_rotation()),   # radians
+        "rotation": vec(instance.assemble_rotation()),  # radians
         "offset_to_assembly": vec(instance.offset_to_assembly()),
     }
 
@@ -300,7 +315,7 @@ def instance_dict(index, instance):
         "printable_flag": instance.printable,
         "is_printable": instance.is_printable(),  # also requires inside print volume
         "offset": vec(instance.offset()),
-        "rotation": vec(instance.rotation()),      # radians
+        "rotation": vec(instance.rotation()),  # radians
         "scale": vec(instance.scaling_factor()),
         "mirror": vec(instance.mirror()),
         "left_handed": instance.is_left_handed(),
@@ -317,30 +332,33 @@ def printable_instance_count(obj):
 
 
 def object_dict(index, obj):
-    volumes = [volume_dict(i, obj.volume(i))
-               for i in range(min(obj.volume_count(), MAX_VOLUMES))]
-    instances = [instance_dict(i, obj.instance(i))
-                 for i in range(min(obj.instance_count(), MAX_INSTANCES))]
+    volumes = [volume_dict(i, obj.volume(i)) for i in range(min(obj.volume_count(), MAX_VOLUMES))]
+    instances = [instance_dict(i, obj.instance(i)) for i in range(min(obj.instance_count(), MAX_INSTANCES))]
     return {
         "index": index,
         "id": obj.id(),
         "name": obj.name,
         "module_name": obj.module_name,
         "input_file": obj.input_file,
-        "printable": obj.printable,       # raw import-time flag, see above
-        "counts": {"volumes": obj.volume_count(), "instances": obj.instance_count(),
-                   "printable_instances": printable_instance_count(obj),
-                   "facets": obj.facets_count(), "parts": obj.parts_count(),
-                   "materials": obj.materials_count(),
-                   "mesh_errors": obj.mesh_errors_count()},
-        "flags": {"multiparts": obj.is_multiparts(), "cut": obj.is_cut(),
-                  "custom_layering": obj.has_custom_layering()},
-        "painted": {"support": obj.is_fdm_support_painted(),
-                    "seam": obj.is_seam_painted(),
-                    "multimaterial": obj.is_mm_painted(),
-                    "fuzzy_skin": obj.is_fuzzy_skin_painted()},
+        "printable": obj.printable,  # raw import-time flag, see above
+        "counts": {
+            "volumes": obj.volume_count(),
+            "instances": obj.instance_count(),
+            "printable_instances": printable_instance_count(obj),
+            "facets": obj.facets_count(),
+            "parts": obj.parts_count(),
+            "materials": obj.materials_count(),
+            "mesh_errors": obj.mesh_errors_count(),
+        },
+        "flags": {"multiparts": obj.is_multiparts(), "cut": obj.is_cut(), "custom_layering": obj.has_custom_layering()},
+        "painted": {
+            "support": obj.is_fdm_support_painted(),
+            "seam": obj.is_seam_painted(),
+            "multimaterial": obj.is_mm_painted(),
+            "fuzzy_skin": obj.is_fuzzy_skin_painted(),
+        },
         "z_range": [round(float(obj.min_z()), 3), round(float(obj.max_z()), 3)],
-        "bbox": bbox_dict(obj.bounding_box()),            # world, all instances
+        "bbox": bbox_dict(obj.bounding_box()),  # world, all instances
         "raw_bbox": bbox_dict(obj.raw_mesh_bounding_box()),  # untransformed meshes
         "config": config_rows(obj.config_keys(), obj.config_value),
         "volumes": volumes,
@@ -356,8 +374,7 @@ def build_model():
     shown = min(count, MAX_OBJECTS)
     return {
         # carried along so the extruder swatches never depend on a stale Overview
-        "filament_colors": split_config_list(
-            orca.host.preset_bundle().full_config_value("filament_colour")),
+        "filament_colors": split_config_list(orca.host.preset_bundle().full_config_value("filament_colour")),
         "id": model.id(),
         "object_count": count,
         "objects_omitted": count - shown,
@@ -387,27 +404,41 @@ def build_assembly():
         for part in [p for p in re.split(r"[/\\]", module) if p]:
             node = node["groups"].setdefault(part, {"name": part, "groups": {}, "objects": []})
 
-        instances = [{"index": j, "offset": vec(obj.instance(j).offset()),
-                      "printable": obj.instance(j).printable,
-                      "assemble": assemble_dict(obj.instance(j))}
-                     for j in range(min(obj.instance_count(), MAX_INSTANCES))]
+        instances = [
+            {
+                "index": j,
+                "offset": vec(obj.instance(j).offset()),
+                "printable": obj.instance(j).printable,
+                "assemble": assemble_dict(obj.instance(j)),
+            }
+            for j in range(min(obj.instance_count(), MAX_INSTANCES))
+        ]
         bb = bbox_dict(obj.raw_mesh_bounding_box())
-        node["objects"].append({"index": i, "name": obj.name,
-                                "printable_instances": printable_instance_count(obj),
-                                "instance_count": obj.instance_count(),
-                                "size": bb["size"] if bb else None,
-                                "instances": instances,
-                                "instances_omitted": obj.instance_count() - len(instances)})
+        node["objects"].append(
+            {
+                "index": i,
+                "name": obj.name,
+                "printable_instances": printable_instance_count(obj),
+                "instance_count": obj.instance_count(),
+                "size": bb["size"] if bb else None,
+                "instances": instances,
+                "instances_omitted": obj.instance_count() - len(instances),
+            }
+        )
 
     def freeze(node):  # dict-of-groups -> sorted list, for stable JSON
-        return {"name": node["name"],
-                "groups": [freeze(node["groups"][k]) for k in sorted(node["groups"])],
-                "objects": node["objects"]}
+        return {
+            "name": node["name"],
+            "groups": [freeze(node["groups"][k]) for k in sorted(node["groups"])],
+            "objects": node["objects"],
+        }
 
-    return {"tree": freeze(root),
-            "object_count": count,
-            "objects_omitted": model.object_count() - count,
-            "has_modules": has_modules}
+    return {
+        "tree": freeze(root),
+        "object_count": count,
+        "objects_omitted": model.object_count() - count,
+        "has_modules": has_modules,
+    }
 
 
 def build_mesh(object_index, volume_index):
@@ -433,15 +464,13 @@ def build_mesh(object_index, volume_index):
     if np is None or mesh.is_empty():
         return data
 
-    V = np.asarray(mesh.vertices())      # (N, 3) float32, read-only, zero-copy
-    T = np.asarray(mesh.triangles())     # (M, 3) int32,  read-only, zero-copy
+    V = np.asarray(mesh.vertices())  # (N, 3) float32, read-only, zero-copy
+    T = np.asarray(mesh.triangles())  # (M, 3) int32,  read-only, zero-copy
     N = np.asarray(mesh.face_normals())  # (M, 3) float32, computed copy
-    tri = V[T].astype(np.float64)        # (M, 3, 3) corner positions
-    area = 0.5 * np.linalg.norm(np.cross(tri[:, 1] - tri[:, 0],
-                                         tri[:, 2] - tri[:, 0]), axis=1).sum()
+    tri = V[T].astype(np.float64)  # (M, 3, 3) corner positions
+    area = 0.5 * np.linalg.norm(np.cross(tri[:, 1] - tri[:, 0], tri[:, 2] - tri[:, 0]), axis=1).sum()
     data["numpy"] = {
-        "vertices": f"shape={V.shape} dtype={V.dtype} writeable={V.flags.writeable} "
-                    f"zero_copy={V.base is not None}",
+        "vertices": f"shape={V.shape} dtype={V.dtype} writeable={V.flags.writeable} zero_copy={V.base is not None}",
         "triangles": f"shape={T.shape} dtype={T.dtype}",
         "normals": f"shape={N.shape} dtype={N.dtype}",
         "surface_area_mm2": round(float(area), 3),
@@ -453,10 +482,9 @@ def build_mesh(object_index, volume_index):
         instance = obj.instance(0)
         homog = np.c_[V.astype(np.float64), np.ones(len(V))]
         world = (homog @ (instance.matrix() @ volume.matrix()).T)[:, :3]
-        sample = world[::max(1, len(world) // MAX_PREVIEW_POINTS)]
+        sample = world[:: max(1, len(world) // MAX_PREVIEW_POINTS)]
         data["numpy"]["world_bbox"] = {"min": vec(world.min(0)), "max": vec(world.max(0))}
-        data["preview"] = {"points": [vec(p) for p in sample],
-                           "sampled": len(sample), "total": len(world)}
+        data["preview"] = {"points": [vec(p) for p in sample], "sampled": len(sample), "total": len(world)}
         # The same mesh placed by the Assemble view (new 2026-07 API, guarded).
         if hasattr(instance, "assemble_matrix") and instance.is_assemble_initialized():
             asm = (homog @ (instance.assemble_matrix() @ volume.matrix()).T)[:, :3]
@@ -525,11 +553,14 @@ CFG_TABLE_CSS = r"""
   td.val .more { color:var(--accent); cursor:pointer; }
 """
 
-PAGE = r"""<!DOCTYPE html>
+PAGE = (
+    r"""<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<style>""" + BASE_CSS + r"""
+<style>"""
+    + BASE_CSS
+    + r"""
   body { height:100vh; display:flex; flex-direction:column; overflow:hidden; }
 
   header { flex:none; display:flex; align-items:center; gap:10px;
@@ -561,7 +592,9 @@ PAGE = r"""<!DOCTYPE html>
   .card h3 { margin:0 0 8px; font-size:11px; letter-spacing:.07em;
              text-transform:uppercase; color:var(--muted); }
   .card.wide { grid-column:1 / -1; }
-""" + HUE_CSS + r"""  .card.hued { border-top:3px solid var(--hue); }
+"""
+    + HUE_CSS
+    + r"""  .card.hued { border-top:3px solid var(--hue); }
   .dot { display:inline-block; width:9px; height:9px; border-radius:50%;
          background:var(--hue); margin-right:6px; }
   .pgroup { margin-bottom:18px; }
@@ -586,7 +619,9 @@ PAGE = r"""<!DOCTYPE html>
   .toolbar { display:flex; gap:8px; align-items:center; margin-bottom:10px; }
   .toolbar input { flex:1; max-width:340px; }
   .count { color:var(--muted); font-size:12px; }
-""" + CFG_TABLE_CSS + r"""
+"""
+    + CFG_TABLE_CSS
+    + r"""
   .node  { margin:1px 0; }
   .nhead { display:flex; align-items:center; gap:7px; padding:4px 8px;
            border-radius:6px; cursor:pointer; user-select:none; flex-wrap:wrap; }
@@ -1221,12 +1256,16 @@ show('overview');
 </body>
 </html>
 """
+)
 
 
 # The modal page demoed from the UI Toolkit tab: create_window(style=WINDOW_MODAL)
 # keeps the handle alive for callbacks; orca.submit(payload) invokes on_submit.
-MODAL_PAGE = r"""<!DOCTYPE html>
-<html lang="en"><head><meta charset="utf-8"><style>""" + BASE_CSS + r"""
+MODAL_PAGE = (
+    r"""<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8"><style>"""
+    + BASE_CSS
+    + r"""
   body { padding:18px; }
   h3 { margin-top:0; }
   input { width:100%; }
@@ -1242,9 +1281,13 @@ MODAL_PAGE = r"""<!DOCTYPE html>
   </p>
 </body></html>
 """
+)
 
-CHILD_PAGE = r"""<!DOCTYPE html>
-<html lang="en"><head><meta charset="utf-8"><style>""" + BASE_CSS + r"""
+CHILD_PAGE = (
+    r"""<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8"><style>"""
+    + BASE_CSS
+    + r"""
   body { padding:18px; }
   h3 { margin-top:0; }
 </style></head>
@@ -1262,12 +1305,17 @@ CHILD_PAGE = r"""<!DOCTYPE html>
   </script>
 </body></html>
 """
+)
 
 # The per-preset config viewer, opened by "View config" on the Presets tab. Its rows are
 # baked in as JSON at build time, so the window needs no bridge traffic and stays usable
 # side by side with the panel until closed.
-CONFIG_PAGE = r"""<!DOCTYPE html>
-<html lang="en"><head><meta charset="utf-8"><style>""" + BASE_CSS + CFG_TABLE_CSS + r"""
+CONFIG_PAGE = (
+    r"""<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8"><style>"""
+    + BASE_CSS
+    + CFG_TABLE_CSS
+    + r"""
   body { padding:12px 16px 20px; border-top:3px solid var(--hue, var(--accent)); }
   .toolbar { display:flex; gap:8px; align-items:center; flex-wrap:wrap; margin-bottom:10px; }
   .toolbar h3 { margin:0; font-size:13px; }
@@ -1324,6 +1372,7 @@ filter('');
 </script>
 </body></html>
 """
+)
 
 
 def config_page(collection, name, rows):
@@ -1410,8 +1459,7 @@ class OrcaInspectorPanel(orca.script.ScriptPluginCapabilityBase):
     def send_mesh(self, object_index, volume_index):
         reply = {"command": "mesh", "object": object_index, "volume": volume_index}
         try:
-            self.win.post({**reply, "ok": True,
-                           "data": build_mesh(int(object_index), int(volume_index))})
+            self.win.post({**reply, "ok": True, "data": build_mesh(int(object_index), int(volume_index))})
         except Exception as exc:
             self.win.post({**reply, "ok": False, "error": str(exc)})
 
@@ -1424,9 +1472,8 @@ class OrcaInspectorPanel(orca.script.ScriptPluginCapabilityBase):
             if self.cfgwin is not None:
                 self.cfgwin.close()
             self.cfgwin = orca.host.ui.create_window(
-                title=f"Orca Inspector — {name}",
-                html=config_page(collection, name, rows),
-                width=520, height=640)
+                title=f"Orca Inspector — {name}", html=config_page(collection, name, rows), width=520, height=640
+            )
             self.win.post({**reply, "ok": True})
         except Exception as exc:
             self.win.post({**reply, "ok": False, "error": str(exc)})
@@ -1445,7 +1492,8 @@ class OrcaInspectorPanel(orca.script.ScriptPluginCapabilityBase):
                     msg.get("text") or "Hello from Orca Inspector",
                     title="Orca Inspector",
                     buttons=msg.get("buttons", "ok"),
-                    icon=msg.get("icon", "info"))
+                    icon=msg.get("icon", "info"),
+                )
                 report(f"user clicked {clicked!r}")
             elif action == "modal":
                 if self.modal is not None and self.modal.is_open():
@@ -1454,14 +1502,15 @@ class OrcaInspectorPanel(orca.script.ScriptPluginCapabilityBase):
                 # The modal window is created asynchronously on the UI thread,
                 # but the handle remains usable for post()/close() and callbacks.
                 self.modal = orca.host.ui.create_window(
-                    html=MODAL_PAGE, title="Orca Inspector — modal", width=420, height=280,
+                    html=MODAL_PAGE,
+                    title="Orca Inspector — modal",
+                    width=420,
+                    height=280,
                     style=orca.host.ui.WINDOW_MODAL,
-                    on_message=lambda m: self.win.post(
-                        {**reply, "ok": True, "result": f"modal posted {m!r} while open"}),
-                    on_submit=lambda result: self.win.post(
-                        {**reply, "ok": True, "result": f"modal submitted {result!r}"}),
-                    on_close=lambda: self.win.post(
-                        {**reply, "ok": True, "result": "modal closed"}))
+                    on_message=lambda m: self.win.post({**reply, "ok": True, "result": f"modal posted {m!r} while open"}),
+                    on_submit=lambda result: self.win.post({**reply, "ok": True, "result": f"modal submitted {result!r}"}),
+                    on_close=lambda: self.win.post({**reply, "ok": True, "result": "modal closed"}),
+                )
                 report("modal opened")
             elif action == "progress":
                 threading.Thread(target=self.progress_demo, daemon=True).start()
@@ -1476,16 +1525,20 @@ class OrcaInspectorPanel(orca.script.ScriptPluginCapabilityBase):
                     # Not `reply`: the close can also come from "child_close" later, so the
                     # on_close payload is labelled neutrally.
                     self.child = orca.host.ui.create_window(
-                        title="Orca Inspector — child", html=CHILD_PAGE,
-                        width=380, height=240, on_message=self.on_child_message,
+                        title="Orca Inspector — child",
+                        html=CHILD_PAGE,
+                        width=380,
+                        height=240,
+                        on_message=self.on_child_message,
                         on_close=lambda: self.win.post(
-                            {"command": "ui_result", "action": "child",
-                             "ok": True, "result": "child window closed"}))
+                            {"command": "ui_result", "action": "child", "ok": True, "result": "child window closed"}
+                        ),
+                    )
                     report("child opened")
             elif action == "child_close":
                 if self.child is not None:
                     self.child.close()
-                    report("close requested")   # the actual close is logged by on_close
+                    report("close requested")  # the actual close is logged by on_close
                 else:
                     report("no child window")
             elif action == "child_state":
@@ -1499,42 +1552,51 @@ class OrcaInspectorPanel(orca.script.ScriptPluginCapabilityBase):
     def on_child_message(self, msg):
         if (msg or {}).get("command") == "ping":
             self.child.post({"command": "pong"})
-            self.win.post({"command": "ui_result", "action": "child",
-                           "ok": True, "result": "child pinged; replied with pong"})
+            self.win.post({"command": "ui_result", "action": "child", "ok": True, "result": "child pinged; replied with pong"})
 
     # Both demos run on a worker thread: ProgressDialog calls marshal to the UI
     # thread internally, and win.post() is thread-safe, so the app stays live.
     def progress_demo(self):
-        style = (orca.host.ui.PD_APP_MODAL | orca.host.ui.PD_AUTO_HIDE |
-                 orca.host.ui.PD_CAN_ABORT | orca.host.ui.PD_ELAPSED_TIME |
-                 orca.host.ui.PD_ESTIMATED_TIME | orca.host.ui.PD_REMAINING_TIME)
+        style = (
+            orca.host.ui.PD_APP_MODAL
+            | orca.host.ui.PD_AUTO_HIDE
+            | orca.host.ui.PD_CAN_ABORT
+            | orca.host.ui.PD_ELAPSED_TIME
+            | orca.host.ui.PD_ESTIMATED_TIME
+            | orca.host.ui.PD_REMAINING_TIME
+        )
         outcome = "completed 40 steps"
         with orca.host.ui.create_progress_dialog(
-                "Orca Inspector", "Crunching very important numbers…",
-                maximum=40, style=style) as progress:
+            "Orca Inspector", "Crunching very important numbers…", maximum=40, style=style
+        ) as progress:
             for step in range(1, 41):
                 time.sleep(0.05)
                 if not progress.update(step, f"Step {step}/40"):
                     outcome = f"cancelled at step {step}"
                     break
-        self.win.post({"command": "ui_result", "action": "progress",
-                       "ok": True, "result": outcome})
+        self.win.post({"command": "ui_result", "action": "progress", "ok": True, "result": outcome})
 
     def pulse_demo(self):
         # ui.ProgressDialog(...) is the constructor form of create_progress_dialog().
         with orca.host.ui.ProgressDialog(
-                "Orca Inspector", "Waiting for something indeterminate…",
-                style=orca.host.ui.PD_APP_MODAL | orca.host.ui.PD_AUTO_HIDE) as progress:
-            for _ in range(10):                     # manual single-shot pulses...
+            "Orca Inspector", "Waiting for something indeterminate…", style=orca.host.ui.PD_APP_MODAL | orca.host.ui.PD_AUTO_HIDE
+        ) as progress:
+            for _ in range(10):  # manual single-shot pulses...
                 time.sleep(0.1)
                 if not progress.pulse("Manual pulse()…"):
                     break
-            progress.start_pulse(80, "Host-timed start_pulse()…")   # ...then host-timed
+            progress.start_pulse(80, "Host-timed start_pulse()…")  # ...then host-timed
             time.sleep(1.5)
             progress.stop_pulse()
             was_open = progress.is_open()
-        self.win.post({"command": "ui_result", "action": "pulse", "ok": True,
-                       "result": f"pulsed manually + via timer (is_open while shown: {was_open})"})
+        self.win.post(
+            {
+                "command": "ui_result",
+                "action": "pulse",
+                "ok": True,
+                "result": f"pulsed manually + via timer (is_open while shown: {was_open})",
+            }
+        )
 
 
 @orca.plugin

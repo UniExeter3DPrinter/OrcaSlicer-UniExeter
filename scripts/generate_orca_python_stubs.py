@@ -18,7 +18,6 @@ import sysconfig
 import venv
 from pathlib import Path
 
-
 REPO_ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_VENV = REPO_ROOT / ".venv-stubgen"
 DEFAULT_OUTPUT = REPO_ROOT / "typings"
@@ -105,16 +104,18 @@ def find_module_dir(build_dir: Path, config: str) -> Path | None:
 
 
 def build_stubgen_module(build_dir: Path, config: str) -> None:
-    run([
-        "cmake",
-        "--build",
-        str(build_dir),
-        "--config",
-        config,
-        "--target",
-        "orca_stubgen",
-        "--",
-    ])
+    run(
+        [
+            "cmake",
+            "--build",
+            str(build_dir),
+            "--config",
+            config,
+            "--target",
+            "orca_stubgen",
+            "--",
+        ]
+    )
 
 
 def import_env(module_dir: Path) -> dict[str, str]:
@@ -128,11 +129,7 @@ def import_env(module_dir: Path) -> dict[str, str]:
 
 
 def verify_import(python: Path, module_dir: Path) -> None:
-    code = (
-        "import orca; "
-        "print(orca.__file__); "
-        "assert hasattr(orca, 'printer_agent'), 'orca.printer_agent is missing'"
-    )
+    code = "import orca; print(orca.__file__); assert hasattr(orca, 'printer_agent'), 'orca.printer_agent is missing'"
     run([str(python), "-c", code], env=import_env(module_dir))
 
 

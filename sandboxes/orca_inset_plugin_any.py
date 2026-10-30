@@ -25,12 +25,13 @@ A surface may split into several islands or vanish when shrunk; both are handled
 
 No numpy required: the whole edit is expressed with the host geometry classes.
 """
+
 import json
 
 import orca
 
 _DEFAULTS = {
-    "inset_mm": 1.0,   # inward offset applied to every slice
+    "inset_mm": 1.0,  # inward offset applied to every slice
 }
 
 

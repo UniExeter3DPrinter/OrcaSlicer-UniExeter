@@ -55,7 +55,7 @@ _ESCAPE = {v: "\\" + k for k, v in _UNESCAPE.items()}
 
 
 def unescape(s):
-    return re.sub(r'\\(.)', lambda m: _UNESCAPE.get(m.group(1), m.group(0)), s)
+    return re.sub(r"\\(.)", lambda m: _UNESCAPE.get(m.group(1), m.group(0)), s)
 
 
 def escape(s):
@@ -236,7 +236,7 @@ class Catalog:
         lines = list(self.lines)
         for i in sorted(self.changes, reverse=True):
             e = self.entries[i]
-            lines[e.first_line:e.first_line + len(e.lines)] = self.changes[i]
+            lines[e.first_line : e.first_line + len(e.lines)] = self.changes[i]
         text = self.newline.join(lines) + (self.newline if self.trailing else "")
         self.path.write_bytes((b"\xef\xbb\xbf" if self.bom else b"") + text.encode("utf-8"))
 
@@ -262,13 +262,14 @@ def all_langs():
 # ---------------------------------------------------------------------------
 # Source locations
 
+
 class Sources:
     """Where the source uses each msgid. The catalogs are extracted with --no-location, so this runs
     xgettext again over localization/i18n/list.txt with the keywords scripts/run_gettext.sh passes."""
 
     def __init__(self):
-        self.refs = {}   # (msgctxt, msgid) -> [(file, line)]
-        self.keys = {}   # file -> [(line, key)]
+        self.refs = {}  # (msgctxt, msgid) -> [(file, line)]
+        self.keys = {}  # file -> [(line, key)]
         self._lines = {}
         xgettext = shutil.which("xgettext") or next((str(t) for t in [REPO / "tools" / "xgettext.exe"] if t.exists()), None)
         keywords = sorted(set(re.findall(r"--keyword=\S+", (REPO / "scripts" / "run_gettext.sh").read_text(encoding="utf-8"))))
@@ -280,8 +281,12 @@ class Sources:
         with tempfile.TemporaryDirectory() as d:
             lst, pot = Path(d) / "list.txt", Path(d) / "located.pot"
             lst.write_text("\n".join(files) + "\n", encoding="utf-8")
-            r = subprocess.run([xgettext, *keywords, "--from-code=UTF-8", "--boost", "--no-wrap", "-f", str(lst), "-o", str(pot)],
-                               cwd=REPO, capture_output=True, text=True)
+            r = subprocess.run(
+                [xgettext, *keywords, "--from-code=UTF-8", "--boost", "--no-wrap", "-f", str(lst), "-o", str(pot)],
+                cwd=REPO,
+                capture_output=True,
+                text=True,
+            )
             if r.returncode or not pot.exists():
                 print(f"note: xgettext failed; entries carry no source context\n{r.stderr.strip()}", file=sys.stderr)
                 return
@@ -314,7 +319,7 @@ class Sources:
             end = line  # through the end of the statement, where the placeholder arguments are
             while end < min(len(lines), line + 8) and ";" not in lines[end - 1]:
                 end += 1
-            around = [l.strip()[:160] for l in lines[max(line - 3, 0):end] if l.strip()]
+            around = [l.strip()[:160] for l in lines[max(line - 3, 0) : end] if l.strip()]
             out.append({"at": f"{f}:{line}", "code": "\n".join(around)})
         return out
 
@@ -326,12 +331,14 @@ class Sources:
             for n, k in self.keys.get(f, []):
                 if k != key and k in translated and len(k[1]) <= 80 and abs(n - line) <= span:
                     dist[k] = min(dist.get(k, span), abs(n - line))
-        return [dict({"msgctxt": k[0]} if k[0] else {}, msgid=k[1], msgstr=translated[k])
-                for k in sorted(dist, key=dist.get)[:limit]]
+        return [
+            dict({"msgctxt": k[0]} if k[0] else {}, msgid=k[1], msgstr=translated[k]) for k in sorted(dist, key=dist.get)[:limit]
+        ]
 
 
 # ---------------------------------------------------------------------------
 # Glossary
+
 
 def find_wiki(arg):
     for cand in [arg, os.environ.get("ORCA_WIKI_DIR"), REPO.parent / "OrcaSlicer_WIKI", REPO.parent / "OrcaSlicer.wiki"]:
@@ -404,7 +411,9 @@ class Glossary:
         for row in self.rows:
             base = re.sub(r"\s*\([^)]*\)\s*$", "", row[0]).strip()
             alts = [a.strip() for a in base.split(" / ") if a.strip()]
-            pats = [re.compile(r"(?<![\w-])" + r"[\s-]+".join(map(re.escape, a.split())) + r"(?:s|es)?(?![\w-])", re.I) for a in alts]
+            pats = [
+                re.compile(r"(?<![\w-])" + r"[\s-]+".join(map(re.escape, a.split())) + r"(?:s|es)?(?![\w-])", re.I) for a in alts
+            ]
             self.matchers.append((row, pats))
 
     def column(self, lang):
@@ -425,7 +434,10 @@ class Glossary:
 
     def hints(self, text, lang):
         col = self.column(lang)
-        return [{"term": r[0], "translation": (r[col] if col is not None else "") or None, "description": r[1]} for r in self.matches(text)]
+        return [
+            {"term": r[0], "translation": (r[col] if col is not None else "") or None, "description": r[1]}
+            for r in self.matches(text)
+        ]
 
     def language_notes(self, lang):
         text = self.md.read_text(encoding="utf-8-sig")
@@ -445,7 +457,7 @@ def glossary_ok(msgstr, translation):
         words = [w for w in re.findall(r"\w+", _norm(alt)) if len(w) > 2] or re.findall(r"\w+", _norm(alt))
         if not words:
             return True
-        if all(w in target or (len(w) > 4 and w[:max(4, len(w) * 2 // 3)] in target) for w in words):
+        if all(w in target or (len(w) > 4 and w[: max(4, len(w) * 2 // 3)] in target) for w in words):
             return True
     return False
 
@@ -491,7 +503,9 @@ def validate(e, msgstrs, nplurals, glossary=None, lang=None):
         if c_bad:
             bad.append(f"printf placeholders {c1} -> {c2}" + ("" if positional else " (order must match)"))
         if bad:
-            strict = flags & {"c-format", "boost-format"} and not (e.msgid_plural is not None and i == 0 and nplurals > 1 and not c2 and not b2)
+            strict = flags & {"c-format", "boost-format"} and not (
+                e.msgid_plural is not None and i == 0 and nplurals > 1 and not c2 and not b2
+            )
             (errors if strict else warnings).extend(tag + b for b in bad)
         if s.count("%%") != src.count("%%") and "c-format" in flags:
             errors.append(f"{tag}'%%' count differs")
@@ -518,7 +532,9 @@ def validate(e, msgstrs, nplurals, glossary=None, lang=None):
             warnings.append(f"{tag}snake_case kept? {[t for t in missing if SNAKE.fullmatch(t)]}")
         e1, e2 = END.search(src.rstrip()), END.search(s.rstrip())
         if bool(e1) != bool(e2) and lang != "th":  # Thai has no sentence-final period
-            warnings.append(f"{tag}ending punctuation: source {'ends with ' + repr(e1.group(0)) if e1 else 'has none'}, translation {'ends with ' + repr(e2.group(0)) if e2 else 'has none'}")
+            warnings.append(
+                f"{tag}ending punctuation: source {'ends with ' + repr(e1.group(0)) if e1 else 'has none'}, translation {'ends with ' + repr(e2.group(0)) if e2 else 'has none'}"
+            )
         if s == src and len(src.split()) >= 3:
             warnings.append(f"{tag}identical to the English")
         if glossary and lang:
@@ -540,7 +556,7 @@ def strong_match(src, base):
         return True
     for alt in base.split(" / "):
         for m in re.finditer(r"(?<![\w-])" + re.escape(alt) + r"(?:s|es)?(?![\w-])", src, re.I):
-            if m.group(0)[0].isupper() and not re.search(r"(^|[.!?:]\s+|\n)$", src[:m.start()]):
+            if m.group(0)[0].isupper() and not re.search(r"(^|[.!?:]\s+|\n)$", src[: m.start()]):
                 return True
     return False
 
@@ -560,6 +576,7 @@ def group_senses(hints):
 # ---------------------------------------------------------------------------
 # Commands
 
+
 def out_json(obj, path):
     text = json.dumps(obj, ensure_ascii=False, indent=1)
     if path:
@@ -576,13 +593,16 @@ def cmd_status(a):
         act = c.active()
         empty = sum(1 for e in act if needs_translation(e, c.nplurals) and e.msgid_plural is None)
         plural = sum(1 for e in act if needs_translation(e, c.nplurals) and e.msgid_plural is not None)
-        print(f"{lang:7} {len(act):7} {empty:6} {plural:6} {sum(e.fuzzy for e in act):6} {sum(e.ai for e in act):6} {sum(bool(e.review) for e in act):6}")
+        print(
+            f"{lang:7} {len(act):7} {empty:6} {plural:6} {sum(e.fuzzy for e in act):6} {sum(e.ai for e in act):6} {sum(bool(e.review) for e in act):6}"
+        )
 
 
 def similar_entries(c, e, pool, cutoff=0.72):
     """The closest earlier translation of a similar English text: obsolete entries and translated
     active ones. A reworded or split string usually still has one, and reusing it keeps the wording."""
     import difflib
+
     sm = difflib.SequenceMatcher(autojunk=False)
     sm.set_seq2(e.msgid)
     best = []
@@ -594,25 +614,33 @@ def similar_entries(c, e, pool, cutoff=0.72):
         if r >= cutoff and other != e.msgid:
             best.append((r, other, msgstr, obsolete, human))
     best.sort(key=lambda t: -t[0])
-    return [dict({"msgid": o, "msgstr": s, "obsolete": ob, "similarity": round(r, 2)}, **({"human": True} if h else {}))
-            for r, o, s, ob, h in best[:2]]
+    return [
+        dict({"msgid": o, "msgstr": s, "obsolete": ob, "similarity": round(r, 2)}, **({"human": True} if h else {}))
+        for r, o, s, ob, h in best[:2]
+    ]
 
 
 def similar_pool(c):
-    return [(x.msgid, x.msgstrs()[0], x.obsolete, not x.ai) for x in c.entries
-            if not x.is_header and x.msgstrs() and x.msgstrs()[0] and not x.fuzzy and 8 < len(x.msgid) < 600]
+    return [
+        (x.msgid, x.msgstrs()[0], x.obsolete, not x.ai)
+        for x in c.entries
+        if not x.is_header and x.msgstrs() and x.msgstrs()[0] and not x.fuzzy and 8 < len(x.msgid) < 600
+    ]
 
 
 def human_drift(e, strs, pool):
     """Why a translation strays from a person's text more than the English change explains, or None."""
     import difflib
+
     alike = lambda x, y: difflib.SequenceMatcher(None, x, y, autojunk=False).ratio()
     new, old = "\n".join(strs), "\n".join(e.msgstrs())
     if old.strip() and not e.ai:
         r = alike(old, new)
         if r < 0.85:
-            return (f"replaces a person's translation with text only {r:.0%} like it: keep their words and change "
-                    f"only what the fix needs, or give \"rewrite\": \"<reason>\"")
+            return (
+                f"replaces a person's translation with text only {r:.0%} like it: keep their words and change "
+                f'only what the fix needs, or give "rewrite": "<reason>"'
+            )
         return None
     if old.strip() or len(e.msgid) <= 8:
         return None
@@ -620,8 +648,10 @@ def human_drift(e, strs, pool):
         if s.get("human"):
             r = alike(s["msgstr"], new)
             if r < s["similarity"] - 0.1:
-                return (f"the English is {s['similarity']:.0%} like a string a person translated, but this translation is "
-                        f"only {r:.0%} like theirs: patch their translation, or give \"rewrite\": \"<reason>\"")
+                return (
+                    f"the English is {s['similarity']:.0%} like a string a person translated, but this translation is "
+                    f'only {r:.0%} like theirs: patch their translation, or give "rewrite": "<reason>"'
+                )
             break
     return None
 
@@ -630,7 +660,7 @@ def cmd_pending(a):
     c = Catalog(catalog_path(a.lang))
     g = Glossary(a.wiki, langs=[a.lang])
     todo = [e for e in c.active() if needs_translation(e, c.nplurals, a.include_fuzzy)]
-    batch = todo[a.offset:a.offset + a.limit] if a.limit else todo[a.offset:]
+    batch = todo[a.offset : a.offset + a.limit] if a.limit else todo[a.offset :]
     pool = similar_pool(c)
     src = Sources()
     translated = {e.key(): e.msgstrs()[0] for e in c.active() if e.msgstrs() and e.msgstrs()[0] and not e.fuzzy}
@@ -639,7 +669,7 @@ def cmd_pending(a):
         item = {"id": e.id(), "msgctxt": e.msgctxt, "msgid": e.msgid}
         if e.msgid_plural is not None:
             item["msgid_plural"] = e.msgid_plural
-            item["msgstr_plural"] = (e.msgstrs() + [""] * c.nplurals)[:c.nplurals]
+            item["msgstr_plural"] = (e.msgstrs() + [""] * c.nplurals)[: c.nplurals]
         else:
             item["msgstr"] = e.msgstrs()[0]
         if e.xcomments:
@@ -666,11 +696,23 @@ def cmd_pending(a):
         if hints:
             # Descriptions only where the sense must be chosen or no rendering exists yet.
             bases = [base_term(h["term"]) for h in hints]
-            item["glossary"] = [{k: v for k, v in h.items() if k != "description" or not h["translation"] or bases.count(b) > 1 or b != h["term"]}
-                                for h, b in zip(hints, bases)]
+            item["glossary"] = [
+                {k: v for k, v in h.items() if k != "description" or not h["translation"] or bases.count(b) > 1 or b != h["term"]}
+                for h, b in zip(hints, bases)
+            ]
         items.append({k: v for k, v in item.items() if v is not None})
-    out_json({"lang": a.lang, "nplurals": c.nplurals, "plural_forms": re.search(r"Plural-Forms: ([^\n]*)", c.header.msgstrs()[0]).group(1) if c.header else None,
-              "total_pending": len(todo), "offset": a.offset, "count": len(items), "entries": items}, a.out)
+    out_json(
+        {
+            "lang": a.lang,
+            "nplurals": c.nplurals,
+            "plural_forms": re.search(r"Plural-Forms: ([^\n]*)", c.header.msgstrs()[0]).group(1) if c.header else None,
+            "total_pending": len(todo),
+            "offset": a.offset,
+            "count": len(items),
+            "entries": items,
+        },
+        a.out,
+    )
 
 
 def cmd_apply(a):
@@ -725,7 +767,9 @@ def cmd_apply(a):
         print(f"REJECTED {label}\n    " + "\n    ".join(msgs))
     for label, msgs in warned:
         print(f"WARNING  {label}\n    " + "\n    ".join(msgs))
-    print(f"{'would apply' if a.dry_run else 'applied'} {applied}, rejected {len(rejected)}, warnings {len(warned)}, blank skipped {skipped}")
+    print(
+        f"{'would apply' if a.dry_run else 'applied'} {applied}, rejected {len(rejected)}, warnings {len(warned)}, blank skipped {skipped}"
+    )
     return 1 if rejected else 0
 
 
@@ -734,6 +778,7 @@ def find_msgfmt():
     if os.name == "nt" and exe.exists():
         return str(exe)
     from shutil import which
+
     return which("msgfmt")
 
 
@@ -810,7 +855,9 @@ def cmd_lookup(a):
             continue
         mark = "obsolete " if e.obsolete else f"{e.id()} " + ("AI " if e.ai else "")
         ctx = f"[{e.msgctxt}] " if e.msgctxt else ""
-        print(f"{mark}{ctx}{json.dumps(e.msgid, ensure_ascii=False)}\n    -> {json.dumps(strs[0] if len(strs) == 1 else strs, ensure_ascii=False)}")
+        print(
+            f"{mark}{ctx}{json.dumps(e.msgid, ensure_ascii=False)}\n    -> {json.dumps(strs[0] if len(strs) == 1 else strs, ensure_ascii=False)}"
+        )
         if a.code and not e.obsolete:
             refs, uses = src.refs.get(e.key(), []), src.code(e.key())
             if len(refs) > len(uses):
@@ -839,11 +886,13 @@ def cmd_glossary(a):
         print("\n" + notes)
 
 
-STOP = set("""a an and are as at be been but by can could do does for from has have how if in into is it its
+STOP = set(
+    """a an and are as at be been but by can could do does for from has have how if in into is it its
 may more most must no not of on once one only or other out over same set should so some such than that the
 their them then there these this those to too two up use used uses using very was when where whether which
 while will with without would you your yet all any each every per both also between before after first last
-off new now get gets let lets just already instead still even back down here make makes made via""".split())
+off new now get gets let lets just already instead still even back down here make makes made via""".split()
+)
 
 
 def _singular(key):
@@ -886,9 +935,13 @@ def cmd_candidates(a):
             sentence = len(words) >= 4 and sum(w[0].isupper() for w in words) * 2 < len(words)
             for n in (1, 2, 3):
                 for i in range(len(words) - n + 1):
-                    gram = words[i:i + n]
-                    if gram[0].lower() in STOP or gram[-1].lower() in STOP or len("".join(gram)) < 4 \
-                            or any(w.lower() in STOP and w.lower() != "of" for w in gram):
+                    gram = words[i : i + n]
+                    if (
+                        gram[0].lower() in STOP
+                        or gram[-1].lower() in STOP
+                        or len("".join(gram)) < 4
+                        or any(w.lower() in STOP and w.lower() != "of" for w in gram)
+                    ):
                         continue
                     key = _norm(" ".join(gram))
                     if key in seen or key in known or _singular(key) in known:
@@ -899,14 +952,16 @@ def cmd_candidates(a):
                     d[1] = max(d[1], len(langs))
                     d[4] |= sentence and i > 0 and all(w[0].isupper() for w in gram)
     # A term is a phrase, or a word capitalised mid-sentence or written as an acronym.
-    keep = {k: v for k, v in counts.items()
-            if v[0] >= a.min_count and (" " in k or v[4] or v[2].isupper())}
+    keep = {k: v for k, v in counts.items() if v[0] >= a.min_count and (" " in k or v[4] or v[2].isupper())}
     # Drop fragments only ever seen inside a longer candidate ("IQEX parallel" in "IDEX IQEX parallel").
-    keep = {k: v for k, v in keep.items()
-            if not any(k != k2 and re.search(r"(^| )" + re.escape(k) + r"( |$)", k2) and v2[0] >= v[0] for k2, v2 in keep.items())}
+    keep = {
+        k: v
+        for k, v in keep.items()
+        if not any(k != k2 and re.search(r"(^| )" + re.escape(k) + r"( |$)", k2) and v2[0] >= v[0] for k2, v2 in keep.items())
+    }
     rows = sorted(keep.items(), key=lambda kv: (-kv[1][0], -len(kv[0].split())))
     print("strings  langs  phrase  [label = also a msgid of its own]  e.g.")
-    for k, (cnt, langs, text, example, _) in rows[:a.limit]:
+    for k, (cnt, langs, text, example, _) in rows[: a.limit]:
         ex = example.replace("\n", " ")
         print(f"{cnt:7} {langs:6}  {text}{'  [label]' if k in labels else ''}  e.g. {ex[:70]}{'…' if len(ex) > 70 else ''}")
 
@@ -925,10 +980,13 @@ def _edit_tsv(path, edit):
 def cmd_glossary_set(a):
     wiki = find_wiki(a.wiki)
     if not wiki:
-        print("No OrcaSlicer_WIKI clone found (looked at --wiki, $ORCA_WIKI_DIR and next to this repository).\n"
-              "The glossary must be updated with these terms before the translations that use them ship:\n"
-              f"  {a.term}: " + ", ".join(a.set) + "\n"
-              "Clone https://github.com/OrcaSlicer/OrcaSlicer_WIKI next to this repository, or pass --wiki.", file=sys.stderr)
+        print(
+            "No OrcaSlicer_WIKI clone found (looked at --wiki, $ORCA_WIKI_DIR and next to this repository).\n"
+            "The glossary must be updated with these terms before the translations that use them ship:\n"
+            f"  {a.term}: " + ", ".join(a.set) + "\n"
+            "Clone https://github.com/OrcaSlicer/OrcaSlicer_WIKI next to this repository, or pass --wiki.",
+            file=sys.stderr,
+        )
         return 2
     gdir = wiki / GLOSSARY_DIR
     gen = wiki / "generate_glossary.py"
@@ -966,7 +1024,9 @@ def cmd_glossary_set(a):
                 if cells[0] == a.term and len(cells) > 2 and cells[2].strip() not in MISSING and cells[2] != v:
                     conflicts.append(f"{lang}: '{cells[2]}' -> '{v}'")
         if conflicts and not a.replace:
-            sys.exit("established translations differ (pass --replace, and update the catalogs to match):\n  " + "\n  ".join(conflicts))
+            sys.exit(
+                "established translations differ (pass --replace, and update the catalogs to match):\n  " + "\n  ".join(conflicts)
+            )
 
         def edit_terms(lines):
             for i, l in enumerate(lines):
@@ -975,6 +1035,7 @@ def cmd_glossary_set(a):
                         lines[i] = f"{a.term}\t{a.description}"
                     return
             lines.append(f"{a.term}\t{a.description}")
+
         if new or a.description:
             _edit_tsv(gdir / "terms.tsv", edit_terms)
             r = run_gen("--sync")  # copies the term and description into every language file
@@ -989,7 +1050,9 @@ def cmd_glossary_set(a):
                         lines[i] = "\t".join(cells[:2] + [v])
                         return
                 sys.exit(f"{lang}.tsv has no row for '{a.term}'")
+
             return edit
+
         for lang, v in values.items():
             _edit_tsv(gdir / f"{lang}.tsv", setter(lang, v))
     finally:
@@ -1016,8 +1079,12 @@ def main():
     s.add_argument("--offset", type=int, default=0)
     s.add_argument("--limit", type=int, default=60)
     s.add_argument("--out")
-    s.add_argument("--include-fuzzy", action=argparse.BooleanOptionalAction, default=True,
-                   help="list fuzzy entries too (default): users never see them")
+    s.add_argument(
+        "--include-fuzzy",
+        action=argparse.BooleanOptionalAction,
+        default=True,
+        help="list fuzzy entries too (default): users never see them",
+    )
     s.set_defaults(func=cmd_pending)
 
     s = sub.add_parser("apply")

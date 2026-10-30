@@ -80,7 +80,7 @@ def gates(jobs, names=(GATE, PRIORITY_GATE)):
 
 def arch_of(job):
     name = job["name"]
-    return name[len(ARCH_PREFIX):name.find(")")] if name.startswith(ARCH_PREFIX) else None
+    return name[len(ARCH_PREFIX) : name.find(")")] if name.startswith(ARCH_PREFIX) else None
 
 
 def admitted_arches(jobs):
@@ -90,8 +90,9 @@ def admitted_arches(jobs):
 def arch_built(jobs, arch):
     """True once the arch's app build finished, or one of its jobs failed or was cancelled."""
     own = [job for job in jobs if arch_of(job) == arch]
-    return any(job["conclusion"] in ("failure", "cancelled") for job in own) or \
-        any(" / Build OrcaSlicer" in job["name"] and job["status"] == "completed" for job in own)
+    return any(job["conclusion"] in ("failure", "cancelled") for job in own) or any(
+        " / Build OrcaSlicer" in job["name"] and job["status"] == "completed" for job in own
+    )
 
 
 def priority_waiting(jobs):
@@ -119,7 +120,7 @@ def run_demand(run, jobs, yield_to_priority=False):
 
 def nightly_window(now):
     """The window around today's nightly cron time, as (start, end) in UTC."""
-    cron = datetime.datetime.combine(now.date(), NIGHTLY_UTC, tzinfo=datetime.timezone.utc)
+    cron = datetime.datetime.combine(now.date(), NIGHTLY_UTC, tzinfo=datetime.UTC)
     return cron - NIGHTLY_LEAD, cron + NIGHTLY_GRACE
 
 
@@ -138,11 +139,14 @@ class Api:
 
     def get(self, path, **params):
         query = urllib.parse.urlencode(params)
-        request = urllib.request.Request(f"{self.url}/{path}?{query}", headers={
-            "Accept": "application/vnd.github+json",
-            "Authorization": f"Bearer {self.token}",
-            "X-GitHub-Api-Version": "2022-11-28",
-        })
+        request = urllib.request.Request(
+            f"{self.url}/{path}?{query}",
+            headers={
+                "Accept": "application/vnd.github+json",
+                "Authorization": f"Bearer {self.token}",
+                "X-GitHub-Api-Version": "2022-11-28",
+            },
+        )
         self.calls += 1
         try:
             with urllib.request.urlopen(request, timeout=30) as response:
@@ -164,8 +168,7 @@ class Api:
 def list_runs(api, repo, workflow, **params):
     runs, page = [], 1
     while True:
-        body = api.get(f"repos/{repo}/actions/workflows/{workflow}/runs",
-                       per_page=100, page=page, **params)
+        body = api.get(f"repos/{repo}/actions/workflows/{workflow}/runs", per_page=100, page=page, **params)
         runs += body["workflow_runs"]
         if len(runs) >= body["total_count"] or not body["workflow_runs"]:
             return runs
@@ -173,8 +176,7 @@ def list_runs(api, repo, workflow, **params):
 
 
 def latest_run(api, repo, workflow, **params):
-    runs = api.get(f"repos/{repo}/actions/workflows/{workflow}/runs",
-                   per_page=1, **params)["workflow_runs"]
+    runs = api.get(f"repos/{repo}/actions/workflows/{workflow}/runs", per_page=1, **params)["workflow_runs"]
     return runs[0] if runs else None
 
 
@@ -189,14 +191,15 @@ def measure(api, repo, workflow, run_id, now, priority=False):
     # runs created recently are listed by creation time as well, and this run is
     # read directly.
     since = (now - RECENT).strftime("%Y-%m-%dT%H:%M:%SZ")
-    runs = {run["id"]: run for status in ("in_progress", "queued", "pending", "waiting")
-            for run in list_runs(api, repo, workflow, status=status)}
-    runs.update((run["id"], run) for run in list_runs(api, repo, workflow, created=f">={since}")
-                if run["status"] != "completed")
+    runs = {
+        run["id"]: run
+        for status in ("in_progress", "queued", "pending", "waiting")
+        for run in list_runs(api, repo, workflow, status=status)
+    }
+    runs.update((run["id"], run) for run in list_runs(api, repo, workflow, created=f">={since}") if run["status"] != "completed")
     runs[run_id] = api.get(f"repos/{repo}/actions/runs/{run_id}")
     for run in runs.values():
-        jobs = api.get(f"repos/{repo}/actions/runs/{run['id']}/jobs",
-                       filter="latest", per_page=100)["jobs"]
+        jobs = api.get(f"repos/{repo}/actions/runs/{run['id']}/jobs", filter="latest", per_page=100)["jobs"]
         own = run["id"] == run_id
         demand = run_demand(run, jobs, yield_to_priority=not priority and not own)
         if demand:
@@ -214,8 +217,7 @@ def measure(api, repo, workflow, run_id, now, priority=False):
     return total, lines
 
 
-def wait(measure_now, limit, wait_minutes, poll_seconds,
-         clock=time.monotonic, sleep=time.sleep, log=print):
+def wait(measure_now, limit, wait_minutes, poll_seconds, clock=time.monotonic, sleep=time.sleep, log=print):
     """Polls until this arch fits. Returns the reason it was let in."""
     deadline = clock() + wait_minutes * 60
     failures = 0
@@ -249,8 +251,9 @@ def main():
     def measure_now():
         calls_before = api.calls
         try:
-            total, lines = measure(api, repo, workflow, run_id, datetime.datetime.now(datetime.timezone.utc),
-                                   priority=os.environ.get("PRIORITY") == "true")
+            total, lines = measure(
+                api, repo, workflow, run_id, datetime.datetime.now(datetime.UTC), priority=os.environ.get("PRIORITY") == "true"
+            )
         except Exception:
             print(api.usage(calls_before).strip())
             raise

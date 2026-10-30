@@ -3,11 +3,14 @@
 #
 # The part's native frame (make_female.py): flat back on Y=0, relief rising to Y=+17.27, the FACE
 # carried by X and Z. So the face plane is XZ and the silhouette is the outline projected along Y.
-import os, json
+import json
+import os
+
 import Part
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-s = Part.Shape(); s.read(os.path.join(HERE, "bear.step"))
+s = Part.Shape()
+s.read(os.path.join(HERE, "bear.step"))
 sol = s.Solids[0]
 bb = sol.BoundBox
 print(f"bbox X {bb.XMin:.2f}..{bb.XMax:.2f}  Y {bb.YMin:.2f}..{bb.YMax:.2f}  Z {bb.ZMin:.2f}..{bb.ZMax:.2f}")
@@ -27,6 +30,7 @@ for f in sol.Faces:
 y, face = best
 print(f"back plate at Y={y:.3f}   wires={len(face.Wires)}   area={face.Area:.1f} mm2")
 
+
 def wire_pts(w, tol=0.05):
     # ORDER MATTERS and w.Edges does not carry it: OCC hands the edges back in whatever order the
     # face stored them, so concatenating their discretisations gives a scrambled ring. The first
@@ -43,9 +47,10 @@ def wire_pts(w, tol=0.05):
     # drop consecutive duplicates
     out = [pts[0]]
     for p in pts[1:]:
-        if abs(p[0]-out[-1][0]) > 1e-4 or abs(p[1]-out[-1][1]) > 1e-4:
+        if abs(p[0] - out[-1][0]) > 1e-4 or abs(p[1] - out[-1][1]) > 1e-4:
             out.append(p)
     return out
+
 
 data = {"outer": None, "holes": []}
 outer = face.OuterWire
@@ -54,10 +59,11 @@ for w in face.Wires:
     if w.isSame(outer):
         continue
     pts = wire_pts(w)
-    xs = [p[0] for p in pts]; zs = [p[1] for p in pts]
-    data["holes"].append({"pts": pts,
-                          "cx": round(sum(xs)/len(xs), 3), "cz": round(sum(zs)/len(zs), 3),
-                          "d": round(max(xs)-min(xs), 3)})
+    xs = [p[0] for p in pts]
+    zs = [p[1] for p in pts]
+    data["holes"].append(
+        {"pts": pts, "cx": round(sum(xs) / len(xs), 3), "cz": round(sum(zs) / len(zs), 3), "d": round(max(xs) - min(xs), 3)}
+    )
     print(f"  hole: centre ({data['holes'][-1]['cx']}, {data['holes'][-1]['cz']}) dia {data['holes'][-1]['d']}")
 
 print(f"outer wire: {len(data['outer'])} points")

@@ -37,16 +37,18 @@ getConfig/saveConfig/restoreDefaults/getContext/onConfig/onTheme -- and styles
 itself from the --orca-* theme variables the host hands the frame, so it
 follows OrcaSlicer's light/dark theme.
 """
-import math
+
 import json
+import math
+
 import orca
 
 _DEFAULTS = {
     "twist_deg_per_mm": 1.0,
-    "taper_per_mm":     0.0,
-    "wobble_ampl_mm":   0.0,
+    "taper_per_mm": 0.0,
+    "wobble_ampl_mm": 0.0,
     "wobble_period_mm": 20.0,
-    "min_scale":        0.05,
+    "min_scale": 0.05,
 }
 
 
@@ -589,7 +591,7 @@ class Twistify(orca.slicing.SlicingPipelineCapabilityBase):
             for region in layer.regions():
                 for surface in region.slices.surfaces:
                     ex = surface.expolygon
-                    ex.rotate(theta, center)   # rotate about the object center (in place)
+                    ex.rotate(theta, center)  # rotate about the object center (in place)
                     if s != 1.0:
                         # scale() scales about the coordinate ORIGIN, so re-center the
                         # geometry on the origin first and translate back after, making
@@ -598,7 +600,7 @@ class Twistify(orca.slicing.SlicingPipelineCapabilityBase):
                         ex.scale(s)
                         ex.translate(cx, cy)
                     if ox != 0.0:
-                        ex.translate(ox, 0.0)   # wobble in X
+                        ex.translate(ox, 0.0)  # wobble in X
                     edited = True
             if edited:
                 # Re-derive the merged islands from the twisted region slices.
@@ -609,7 +611,8 @@ class Twistify(orca.slicing.SlicingPipelineCapabilityBase):
         return orca.ExecutionResult.success(
             f"Twistify: transformed {layers_touched} layer(s) of '{name}' "
             f"(twist {p['twist_deg_per_mm']} deg/mm, taper {p['taper_per_mm']}/mm, "
-            f"wobble {p['wobble_ampl_mm']} mm)")
+            f"wobble {p['wobble_ampl_mm']} mm)"
+        )
 
 
 @orca.plugin

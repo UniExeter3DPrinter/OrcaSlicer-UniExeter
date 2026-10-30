@@ -26,8 +26,10 @@ The step may fire more than once per slice (file export and/or upload each run i
 separate working copy), and its output is not reflected in the G-code preview -- the
 viewer maps the pre-post-process file.
 """
-import orca
+
 import json
+
+import orca
 
 _DEFAULTS = {
     "stamp_text": "processed by the OrcaSlicer G-code Stamp plugin",
@@ -45,7 +47,7 @@ def _stamp_text(self):
 class GCodeStamp(orca.slicing.SlicingPipelineCapabilityBase):
     def get_name(self):
         return "G-code Stamp"
-    
+
     def get_default_config(self):
         return _DEFAULTS
 
@@ -60,15 +62,14 @@ class GCodeStamp(orca.slicing.SlicingPipelineCapabilityBase):
 
         # Edit the exported G-code in place: keep the original first line first (some flavors
         # expect a specific leading line), then insert the stamp right after it.
-        with open(ctx.gcode_path, "r", encoding="utf-8", errors="replace") as f:
+        with open(ctx.gcode_path, encoding="utf-8", errors="replace") as f:
             lines = f.readlines()
         insert_at = 1 if lines else 0
         lines.insert(insert_at, comment)
         with open(ctx.gcode_path, "w", encoding="utf-8") as f:
             f.writelines(lines)
 
-        return orca.ExecutionResult.success(
-            "G-code Stamp: stamped '" + (ctx.output_name or ctx.gcode_path) + "'")
+        return orca.ExecutionResult.success("G-code Stamp: stamped '" + (ctx.output_name or ctx.gcode_path) + "'")
 
 
 @orca.plugin

@@ -60,6 +60,7 @@ class Tree:
                 func(path)
             except (OSError, ValueError):  # commonpath raises ValueError across drives
                 pass
+
         hook = "onexc" if sys.version_info >= (3, 12) else "onerror"
         shutil.rmtree(self.dir, **{hook: writable_retry})
 
@@ -84,8 +85,7 @@ class Tree:
 
     def index(self, vendor, section, name, sub_path):
         index = self.read_index(vendor)
-        index.setdefault(section + "_list", []).append(
-            {"name": name, "sub_path": sub_path})
+        index.setdefault(section + "_list", []).append({"name": name, "sub_path": sub_path})
         self.write_index(vendor, index)
 
     def path(self, vendor, rel):
@@ -146,6 +146,7 @@ class TreeCase(unittest.TestCase):
 # normalize
 # ---------------------------------------------------------------------------
 
+
 class TestObsoleteKeys(unittest.TestCase):
     def test_obsolete_keys_match_the_loader_ignore_set(self):
         path = os.path.join(REPO_ROOT, "src", "libslic3r", "PrintConfig.cpp")
@@ -154,7 +155,9 @@ class TestObsoleteKeys(unittest.TestCase):
         match = re.search(
             r"void PrintConfigDef::handle_legacy\(.*?"
             r"static\s+std::set<std::string>\s+ignore\s*=\s*\{(.*?)\};",
-            source, re.DOTALL)
+            source,
+            re.DOTALL,
+        )
         self.assertIsNotNone(match, "Could not locate the loader's obsolete-key set")
         keys = re.sub(r"//[^\n]*|/\*.*?\*/", "", match.group(1), flags=re.DOTALL)
         self.assertEqual(apt.OBSOLETE_KEYS, set(re.findall(r'"([^"\n]+)"', keys)))
@@ -202,17 +205,27 @@ class TestNormalize(TreeCase):
         self.assertEqual(self.t.read("V", "machine/N.json")["type"], "machine")
 
     def test_dropped_keys_go_and_filament_vectors_are_arrayified(self):
-        self.t.write("V", "filament/A.json", {
-            "type": "filament", "name": "A", "version": "1.2.3",
-            "is_custom_defined": "1", "filament_type": "PLA",
-            "filament_vendor": "AV", "travel_speed": 200,
-            "filament_load_time": ["15"], "filament_unload_time": "0"})
+        self.t.write(
+            "V",
+            "filament/A.json",
+            {
+                "type": "filament",
+                "name": "A",
+                "version": "1.2.3",
+                "is_custom_defined": "1",
+                "filament_type": "PLA",
+                "filament_vendor": "AV",
+                "travel_speed": 200,
+                "filament_load_time": ["15"],
+                "filament_unload_time": "0",
+            },
+        )
         rc, out = self.run_command("normalize")
         self.assertEqual(rc, 0, out)
         data = self.t.read("V", "filament/A.json")
         self.assertNotIn("version", data)
         self.assertNotIn("is_custom_defined", data)
-        self.assertNotIn("travel_speed", data)   # a process setting, not a filament one
+        self.assertNotIn("travel_speed", data)  # a process setting, not a filament one
         self.assertNotIn("filament_load_time", data)
         self.assertNotIn("filament_unload_time", data)
         self.assertEqual(data["filament_type"], ["PLA"])
@@ -222,10 +235,18 @@ class TestNormalize(TreeCase):
         for sub in ("filament", "process", "machine"):
             with self.subTest(profile_type=sub):
                 expected = {"type": sub, "name": "A"}
-                self.t.write("V", f"{sub}/A.json", {
-                    **expected, "silent_mode": "", "adaptive_layer_height": "0",
-                    "anisotropic_surfaces": "1", "filament_load_time": ["0"],
-                    "filament_unload_time": "0"})
+                self.t.write(
+                    "V",
+                    f"{sub}/A.json",
+                    {
+                        **expected,
+                        "silent_mode": "",
+                        "adaptive_layer_height": "0",
+                        "anisotropic_surfaces": "1",
+                        "filament_load_time": ["0"],
+                        "filament_unload_time": "0",
+                    },
+                )
                 rc, out = self.run_command("normalize")
                 self.assertEqual(rc, 0, out)
                 self.assertEqual(self.t.read("V", f"{sub}/A.json"), expected)
@@ -237,12 +258,16 @@ class TestNormalize(TreeCase):
 
     def test_the_larger_extruder_clearance_wins(self):
         # Keeping the smaller one would licence a toolhead collision.
-        self.t.write("V", "machine/M.json", {
-            "type": "machine", "name": "M 0.4 nozzle",
-            "extruder_clearance_radius": "45", "extruder_clearance_max_radius": "68"})
-        self.t.write("V", "machine/N.json", {
-            "type": "machine", "name": "N 0.4 nozzle",
-            "extruder_clearance_radius": "68", "extruder_clearance_max_radius": "45"})
+        self.t.write(
+            "V",
+            "machine/M.json",
+            {"type": "machine", "name": "M 0.4 nozzle", "extruder_clearance_radius": "45", "extruder_clearance_max_radius": "68"},
+        )
+        self.t.write(
+            "V",
+            "machine/N.json",
+            {"type": "machine", "name": "N 0.4 nozzle", "extruder_clearance_radius": "68", "extruder_clearance_max_radius": "45"},
+        )
         rc, out = self.run_command("normalize")
         self.assertEqual(rc, 0, out)
         kept = self.t.read("V", "machine/M.json")
@@ -253,9 +278,11 @@ class TestNormalize(TreeCase):
         self.assertEqual(kept["extruder_clearance_radius"], "68")
 
     def test_a_rewritten_file_leads_with_its_identifying_keys(self):
-        self.t.write("V", "filament/A.json", {
-            "filament_cost": [20], "name": "A", "instantiation": "true",
-            "inherits": "base", "version": "1"})
+        self.t.write(
+            "V",
+            "filament/A.json",
+            {"filament_cost": [20], "name": "A", "instantiation": "true", "inherits": "base", "version": "1"},
+        )
         rc, out = self.run_command("normalize")
         self.assertEqual(rc, 0, out)
         keys = list(self.t.read("V", "filament/A.json"))
@@ -265,25 +292,31 @@ class TestNormalize(TreeCase):
         self.t.write("V", "filament/A.json", {"type": "filament", "name": "A"})
         # These used to be misclassified as obsolete: one is active, the other
         # is a legacy alias that still supplies the toolhead clearance on load.
-        self.t.write("V", "machine/M.json", {
-            "type": "machine", "name": "M", "extruder_type": ["Direct Drive"],
-            "extruder_clearance_max_radius": "68", "machine_load_filament_time": "15",
-            "machine_unload_filament_time": "10"})
-        self.t.write("V", "process/P.json", {
-            "type": "process", "name": "P", "travel_speed": "200",
-            "top_surface_fill_order": "outward"})
+        self.t.write(
+            "V",
+            "machine/M.json",
+            {
+                "type": "machine",
+                "name": "M",
+                "extruder_type": ["Direct Drive"],
+                "extruder_clearance_max_radius": "68",
+                "machine_load_filament_time": "15",
+                "machine_unload_filament_time": "10",
+            },
+        )
+        self.t.write(
+            "V", "process/P.json", {"type": "process", "name": "P", "travel_speed": "200", "top_surface_fill_order": "outward"}
+        )
         before = self.t.bytes_map()
         rc, out = self.run_command("normalize")
         self.assertEqual(rc, 0, out)
         self.assertEqual(self.t.bytes_map(), before)
 
     def test_force_rewrites_even_a_conforming_file(self):
-        self.t.write_raw("V", "filament/A.json",
-                         b'{"name":"A","type":"filament"}')
+        self.t.write_raw("V", "filament/A.json", b'{"name":"A","type":"filament"}')
         rc, out = self.run_command("normalize", "--force")
         self.assertEqual(rc, 0, out)
-        self.assertEqual(self.t.raw("V", "filament/A.json"),
-                         b'{\n\t"type": "filament",\n\t"name": "A"\n}\n')
+        self.assertEqual(self.t.raw("V", "filament/A.json"), b'{\n\t"type": "filament",\n\t"name": "A"\n}\n')
 
     def test_dry_run_writes_nothing(self):
         self.t.write("V", "filament/A.json", {"name": "A", "bed_temperature": ["60"]})
@@ -327,16 +360,15 @@ class TestNormalize(TreeCase):
 # trim
 # ---------------------------------------------------------------------------
 
+
 class TestTrim(TreeCase):
     def bundle(self):
-        self.t.write("V", "filament/Listed.json",
-                     {"type": "filament", "name": "Listed"})
+        self.t.write("V", "filament/Listed.json", {"type": "filament", "name": "Listed"})
         self.t.index("V", "filament", "Listed", "filament/Listed.json")
         return self.t
 
     def test_an_unindexed_preset_is_removed(self):
-        self.bundle().write("V", "filament/Orphan.json",
-                            {"type": "filament", "name": "Orphan"})
+        self.bundle().write("V", "filament/Orphan.json", {"type": "filament", "name": "Orphan"})
         rc, out = self.run_command("trim")
         self.assertEqual(rc, 0, out)
         self.assertTrue(os.path.exists(self.t.path("V", "filament/Listed.json")))
@@ -345,8 +377,7 @@ class TestTrim(TreeCase):
     def test_a_dotted_sub_path_still_names_its_file(self):
         # Index entries are hand-written; "filament/./X.json" is the same file.
         self.bundle()
-        self.t.write("V", "filament/Dotted.json",
-                     {"type": "filament", "name": "Dotted"})
+        self.t.write("V", "filament/Dotted.json", {"type": "filament", "name": "Dotted"})
         self.t.index("V", "filament", "Dotted", "filament/./Dotted.json")
         rc, out = self.run_command("trim")
         self.assertEqual(rc, 0, out)
@@ -360,24 +391,19 @@ class TestTrim(TreeCase):
         self.assertTrue(os.path.exists(self.t.path("V", "filament/Broken.json")))
 
     def test_a_data_file_is_not_a_preset(self):
-        self.bundle().write("V", "filament/filaments_color_codes.json",
-                            {"data": [], "total": 0})
+        self.bundle().write("V", "filament/filaments_color_codes.json", {"data": [], "total": 0})
         rc, out = self.run_command("trim")
         self.assertEqual(rc, 0, out)
-        self.assertTrue(os.path.exists(
-            self.t.path("V", "filament/filaments_color_codes.json")))
+        self.assertTrue(os.path.exists(self.t.path("V", "filament/filaments_color_codes.json")))
 
     def test_an_inherited_base_is_kept_and_reported(self):
         # Neither file loads -- the loader only reads indexed sub_paths -- but
         # deleting the parent destroys the only record of what the indexed child
         # was written against, so that is a maintainer's call, not trim's.
         self.bundle()
-        self.t.write("V", "machine/base.json",
-                     {"type": "machine", "name": "V base"})
-        self.t.write("V", "machine/mid.json",
-                     {"type": "machine", "name": "V mid", "inherits": "V base"})
-        self.t.write("V", "machine/M.json",
-                     {"type": "machine", "name": "M 0.4 nozzle", "inherits": "V mid"})
+        self.t.write("V", "machine/base.json", {"type": "machine", "name": "V base"})
+        self.t.write("V", "machine/mid.json", {"type": "machine", "name": "V mid", "inherits": "V base"})
+        self.t.write("V", "machine/M.json", {"type": "machine", "name": "M 0.4 nozzle", "inherits": "V mid"})
         self.t.index("V", "machine", "M 0.4 nozzle", "machine/M.json")
         rc, out = self.run_command("trim")
         self.assertEqual(rc, 0, out)
@@ -391,13 +417,10 @@ class TestTrim(TreeCase):
         # child actually gets; the unindexed twin is a leftover the loader never
         # reaches, and being named in an inherits does not earn it a reprieve.
         self.bundle()
-        self.t.write("V", "machine/HSN/base.json",
-                     {"type": "machine", "name": "V base"})
+        self.t.write("V", "machine/HSN/base.json", {"type": "machine", "name": "V base"})
         self.t.index("V", "machine", "V base", "machine/HSN/base.json")
-        self.t.write("V", "machine/base.json",
-                     {"type": "machine", "name": "V base"})
-        self.t.write("V", "machine/M.json",
-                     {"type": "machine", "name": "M 0.4 nozzle", "inherits": "V base"})
+        self.t.write("V", "machine/base.json", {"type": "machine", "name": "V base"})
+        self.t.write("V", "machine/M.json", {"type": "machine", "name": "M 0.4 nozzle", "inherits": "V base"})
         self.t.index("V", "machine", "M 0.4 nozzle", "machine/M.json")
         rc, out = self.run_command("trim")
         self.assertEqual(rc, 0, out)
@@ -407,8 +430,7 @@ class TestTrim(TreeCase):
         self.assertIn('machine/HSN/base.json is the profile named "V base"', out)
 
     def test_dry_run_deletes_nothing(self):
-        self.bundle().write("V", "filament/Orphan.json",
-                            {"type": "filament", "name": "Orphan"})
+        self.bundle().write("V", "filament/Orphan.json", {"type": "filament", "name": "Orphan"})
         before = self.t.bytes_map()
         rc, out = self.run_command("trim", "--dry-run")
         self.assertEqual(rc, 0, out)
@@ -420,6 +442,7 @@ class TestTrim(TreeCase):
 # update-index
 # ---------------------------------------------------------------------------
 
+
 class TestUpdateIndex(TreeCase):
     def test_every_profile_on_disk_lands_in_its_own_section(self):
         self.t.write("V", "filament/A.json", {"type": "filament", "name": "A"})
@@ -429,14 +452,10 @@ class TestUpdateIndex(TreeCase):
         rc, out = self.run_command("update-index")
         self.assertEqual(rc, 0, out)
         index = self.t.read_index("V")
-        self.assertEqual(index["filament_list"],
-                         [{"name": "A", "sub_path": "filament/A.json"}])
-        self.assertEqual(index["process_list"],
-                         [{"name": "B", "sub_path": "process/B.json"}])
-        self.assertEqual(index["machine_list"],
-                         [{"name": "M", "sub_path": "machine/M.json"}])
-        self.assertEqual(index["machine_model_list"],
-                         [{"name": "MM", "sub_path": "machine/MM.json"}])
+        self.assertEqual(index["filament_list"], [{"name": "A", "sub_path": "filament/A.json"}])
+        self.assertEqual(index["process_list"], [{"name": "B", "sub_path": "process/B.json"}])
+        self.assertEqual(index["machine_list"], [{"name": "M", "sub_path": "machine/M.json"}])
+        self.assertEqual(index["machine_model_list"], [{"name": "MM", "sub_path": "machine/MM.json"}])
 
     def test_parents_are_listed_before_their_children(self):
         # The loader resolves inherits in one pass over the list.
@@ -447,8 +466,7 @@ class TestUpdateIndex(TreeCase):
             self.t.write("V", f"filament/{name}.json", data)
         rc, out = self.run_command("update-index")
         self.assertEqual(rc, 0, out)
-        self.assertEqual([e["name"] for e in self.t.read_index("V")["filament_list"]],
-                         ["A", "B", "C"])
+        self.assertEqual([e["name"] for e in self.t.read_index("V")["filament_list"]], ["A", "B", "C"])
         # inherits is ordering input only; it never lands in the index.
         for entry in self.t.read_index("V")["filament_list"]:
             self.assertEqual(sorted(entry), ["name", "sub_path"])
@@ -457,12 +475,10 @@ class TestUpdateIndex(TreeCase):
         # The loader resolves include like inherits: in one pass over the list, so
         # a template must be listed before every preset that includes it - even
         # though a template has no parent of its own to order it by.
-        self.t.write("V", "machine/P.json", {"type": "machine", "name": "P",
-                                             "include": ["T start", "T end"]})
+        self.t.write("V", "machine/P.json", {"type": "machine", "name": "P", "include": ["T start", "T end"]})
         self.t.write("V", "machine/T start.json", {"type": "machine", "name": "T start"})
         self.t.write("V", "machine/T end.json", {"type": "machine", "name": "T end"})
-        self.t.write("V", "filament/F.json", {"type": "filament", "name": "F",
-                                              "inherits": "B", "include": "S"})
+        self.t.write("V", "filament/F.json", {"type": "filament", "name": "F", "inherits": "B", "include": "S"})
         self.t.write("V", "filament/B.json", {"type": "filament", "name": "B"})
         self.t.write("V", "filament/S.json", {"type": "filament", "name": "S"})
         rc, out = self.run_command("update-index")
@@ -537,14 +553,24 @@ class TestUpdateIndex(TreeCase):
 # check
 # ---------------------------------------------------------------------------
 
+
 class TestCheck(TreeCase):
     def bundle(self):
         """A bundle that passes every per-vendor check."""
-        self.t.write("V", "filament/A.json", {
-            "type": "filament", "name": "A", "instantiation": "true",
-            "filament_id": "OFaaaaaa", "filament_type": ["PLA"],
-            "filament_vendor": ["AV"], "compatible_printers": ["M 0.4 nozzle"],
-            "setting_id": apt.generate_preset_setting_id("V", "filament", "A")})
+        self.t.write(
+            "V",
+            "filament/A.json",
+            {
+                "type": "filament",
+                "name": "A",
+                "instantiation": "true",
+                "filament_id": "OFaaaaaa",
+                "filament_type": ["PLA"],
+                "filament_vendor": ["AV"],
+                "compatible_printers": ["M 0.4 nozzle"],
+                "setting_id": apt.generate_preset_setting_id("V", "filament", "A"),
+            },
+        )
         self.t.index("V", "filament", "A", "filament/A.json")
         return self.t
 
@@ -569,16 +595,14 @@ class TestCheck(TreeCase):
         self.assertEqual(errors, 0, out)
 
     def test_an_instantiated_filament_needs_compatible_printers(self):
-        self.bundle().write("V", "filament/B.json", {
-            "type": "filament", "name": "B", "instantiation": "true"})
+        self.bundle().write("V", "filament/B.json", {"type": "filament", "name": "B", "instantiation": "true"})
         errors, out = self.per_vendor_errors()
         self.assertGreater(errors, 0)
         self.assertIn("'compatible_printers' missing", out)
 
     def test_a_library_filament_may_leave_compatible_printers_empty(self):
         # The shared library is exempt from that rule and nothing else.
-        self.t.write(apt.OFL, "filament/A.json",
-                     {"type": "filament", "name": "A", "instantiation": "true"})
+        self.t.write(apt.OFL, "filament/A.json", {"type": "filament", "name": "A", "instantiation": "true"})
         buf = io.StringIO()
         with contextlib.redirect_stdout(buf):
             errors = apt.check_filament_compatible_printers(self.t.profiles, apt.OFL)
@@ -587,16 +611,13 @@ class TestCheck(TreeCase):
     def test_the_library_is_checked_like_any_other_bundle(self):
         # A file the library's own index does not reference must fail plain
         # `check`, now that the per-vendor pass no longer skips it.
-        self.t.write(apt.OFL, "filament/Stray.json",
-                     {"type": "filament", "name": "Stray"})
+        self.t.write(apt.OFL, "filament/Stray.json", {"type": "filament", "name": "Stray"})
         rc, out = self.run_command("check")
         self.assertEqual(rc, 1, out)
-        self.assertIn(f"{apt.OFL}/filament/Stray.json: no {apt.OFL}.json list "
-                      f"references it", out)
+        self.assertIn(f"{apt.OFL}/filament/Stray.json: no {apt.OFL}.json list references it", out)
 
     def test_a_duplicate_key_is_an_error(self):
-        self.bundle().write_raw("V", "filament/B.json",
-                                b'{"type":"filament","name":"B","name":"B2"}')
+        self.bundle().write_raw("V", "filament/B.json", b'{"type":"filament","name":"B","name":"B2"}')
         errors, out = self.per_vendor_errors()
         self.assertGreater(errors, 0)
         self.assertIn("Duplicate key", out)
@@ -617,16 +638,17 @@ class TestCheck(TreeCase):
         self.assertIn("Missing sub profile", out)
 
     def test_a_vector_option_may_not_be_a_scalar(self):
-        self.bundle().write("V", "filament/B.json", {
-            "type": "filament", "name": "B", "filament_type": "PLA"})
+        self.bundle().write("V", "filament/B.json", {"type": "filament", "name": "B", "filament_type": "PLA"})
         errors, out = self.per_vendor_errors()
         self.assertGreater(errors, 0)
         self.assertIn("must be an array", out)
 
     def test_renamed_and_old_option_may_not_co_exist(self):
-        self.bundle().write("V", "machine/M.json", {
-            "type": "machine", "name": "M 0.4 nozzle",
-            "extruder_clearance_radius": "45", "extruder_clearance_max_radius": "68"})
+        self.bundle().write(
+            "V",
+            "machine/M.json",
+            {"type": "machine", "name": "M 0.4 nozzle", "extruder_clearance_radius": "45", "extruder_clearance_max_radius": "68"},
+        )
         errors, out = self.per_vendor_errors()
         self.assertGreater(errors, 0)
         self.assertIn("Conflict keys", out)
@@ -634,8 +656,7 @@ class TestCheck(TreeCase):
     def test_the_length_rule_only_binds_indexed_presets(self):
         # A file the index never loads cannot break AMS matching, and some
         # bundles ship such orphans from before the rule existed.
-        self.bundle().write("V", "filament/Long.json", {
-            "type": "filament", "name": "Long", "filament_id": "OFtoolongforams"})
+        self.bundle().write("V", "filament/Long.json", {"type": "filament", "name": "Long", "filament_id": "OFtoolongforams"})
         errors, out = self.per_vendor_errors()
         self.assertEqual(errors, 0, out)
         self.t.index("V", "filament", "Long", "filament/Long.json")
@@ -644,10 +665,18 @@ class TestCheck(TreeCase):
         self.assertIn("Filament id too long", out)
 
     def test_obsolete_key_warnings_exclude_active_and_renamed_options(self):
-        self.bundle().write("V", "filament/B.json", {
-            "type": "filament", "name": "B", "silent_mode": "0",
-            "anisotropic_surfaces": "0", "extruder_type": ["Direct Drive"],
-            "extruder_clearance_max_radius": "68"})
+        self.bundle().write(
+            "V",
+            "filament/B.json",
+            {
+                "type": "filament",
+                "name": "B",
+                "silent_mode": "0",
+                "anisotropic_surfaces": "0",
+                "extruder_type": ["Direct Drive"],
+                "extruder_clearance_max_radius": "68",
+            },
+        )
         buf = io.StringIO()
         with contextlib.redirect_stdout(buf):
             warnings = apt.check_obsolete_keys(self.t.profiles, "V")
@@ -655,8 +684,7 @@ class TestCheck(TreeCase):
         self.assertIn("Obsolete key", buf.getvalue())
 
     def test_obsolete_key_warnings_run_without_a_flag(self):
-        self.t.write("V", "filament/A.json", {
-            "type": "filament", "name": "A", "silent_mode": "0"})
+        self.t.write("V", "filament/A.json", {"type": "filament", "name": "A", "silent_mode": "0"})
         self.run_command("update-index")
         rc, out = self.run_command("check")
         self.assertEqual(rc, 1, out)  # normalization also rejects the obsolete key
@@ -664,9 +692,7 @@ class TestCheck(TreeCase):
         self.assertIn("Files with warnings : 1", out)
 
     def test_a_default_material_must_exist_somewhere(self):
-        self.bundle().write("V", "machine/M.json", {
-            "type": "machine", "name": "M 0.4 nozzle",
-            "default_materials": "A;Nope"})
+        self.bundle().write("V", "machine/M.json", {"type": "machine", "name": "M 0.4 nozzle", "default_materials": "A;Nope"})
         buf = io.StringIO()
         with contextlib.redirect_stdout(buf):
             errors, _warn = apt.check_machine_default_materials(self.t.profiles, "V")
@@ -677,9 +703,7 @@ class TestCheck(TreeCase):
         # The reference check is part of the default run, not an opt-in: a
         # dangling name has to fail plain `check`.
         self.bundle()
-        self.t.write("V", "machine/M.json", {
-            "type": "machine", "name": "M 0.4 nozzle",
-            "default_filament_profile": ["A", "Nope"]})
+        self.t.write("V", "machine/M.json", {"type": "machine", "name": "M 0.4 nozzle", "default_filament_profile": ["A", "Nope"]})
         self.t.index("V", "machine", "M 0.4 nozzle", "machine/M.json")
         rc, out = self.run_command("check")
         self.assertEqual(rc, 1, out)
@@ -703,8 +727,7 @@ class TestCheck(TreeCase):
         return errors, buf.getvalue()
 
     def test_one_bundle_may_not_hold_two_profiles_of_a_name(self):
-        self.bundle().write("V", "filament/dup.json", {
-            "type": "filament", "name": "A", "instantiation": "false"})
+        self.bundle().write("V", "filament/dup.json", {"type": "filament", "name": "A", "instantiation": "false"})
         errors, out = self.names()
         self.assertEqual(errors, 1, out)
         self.assertIn('V has 2 filament profiles named "A"', out)
@@ -714,8 +737,7 @@ class TestCheck(TreeCase):
         # machine/, which no per-vendor check walked, one index edit away from
         # silently deciding which of the two a whole bundle inherits from.
         self.bundle()
-        self.t.write("V", "machine/HSN/base.json",
-                     {"type": "machine", "name": "V base"})
+        self.t.write("V", "machine/HSN/base.json", {"type": "machine", "name": "V base"})
         self.t.index("V", "machine", "V base", "machine/HSN/base.json")
         self.t.write("V", "machine/base.json", {"type": "machine", "name": "V base"})
         errors, out = self.names()
@@ -733,8 +755,7 @@ class TestCheck(TreeCase):
         # fdm_machine_common exists in 60 shipped bundles; the name is scoped to the
         # bundle that resolves it, so sharing one across vendors is not a clash.
         for vendor in ("V", "W"):
-            self.t.write(vendor, "machine/common.json",
-                         {"type": "machine", "name": "fdm_machine_common"})
+            self.t.write(vendor, "machine/common.json", {"type": "machine", "name": "fdm_machine_common"})
             self.t.index(vendor, "machine", "fdm_machine_common", "machine/common.json")
         for vendor in ("V", "W"):
             errors, out = self.names(vendor)
@@ -752,9 +773,11 @@ class TestCheck(TreeCase):
         # matches a preset's printer_model against every vendor's model names, so a
         # copy of another vendor's model is ambiguous, not merely duplicated.
         for vendor in ("V", "W"):
-            self.t.write(vendor, "machine/MyKlipper.json",
-                         {"type": "machine_model", "name": "Generic Klipper Printer",
-                          "model_id": "my_klipper_01"})
+            self.t.write(
+                vendor,
+                "machine/MyKlipper.json",
+                {"type": "machine_model", "name": "Generic Klipper Printer", "model_id": "my_klipper_01"},
+            )
         errors, out = self.machine_models()
         self.assertEqual(errors, 1, out)
         self.assertIn('machine_model name "Generic Klipper Printer"', out)
@@ -763,8 +786,7 @@ class TestCheck(TreeCase):
 
     def test_distinct_machine_model_names_are_left_alone(self):
         for vendor in ("V", "W"):
-            self.t.write(vendor, "machine/model.json",
-                         {"type": "machine_model", "name": f"{vendor} Model"})
+            self.t.write(vendor, "machine/model.json", {"type": "machine_model", "name": f"{vendor} Model"})
         errors, out = self.machine_models()
         self.assertEqual(errors, 0, out)
 
@@ -776,8 +798,7 @@ class TestCheck(TreeCase):
         return errors, gaps, buf.getvalue()
 
     def test_a_file_no_list_references_is_an_error(self):
-        self.bundle().write("V", "filament/Stray.json",
-                            {"type": "filament", "name": "Stray"})
+        self.bundle().write("V", "filament/Stray.json", {"type": "filament", "name": "Stray"})
         errors, gaps, out = self.coverage()
         self.assertEqual(errors, 1, out)
         self.assertEqual(gaps["unindexed"], 1)
@@ -799,15 +820,13 @@ class TestCheck(TreeCase):
 
     def test_a_dotted_sub_path_still_counts_as_listed(self):
         self.bundle()
-        self.t.write("V", "filament/Dotted.json",
-                     {"type": "filament", "name": "Dotted"})
+        self.t.write("V", "filament/Dotted.json", {"type": "filament", "name": "Dotted"})
         self.t.index("V", "filament", "Dotted", "filament/./Dotted.json")
         errors, _gaps, out = self.coverage()
         self.assertEqual(errors, 0, out)
 
     def test_a_data_file_is_not_expected_in_the_index(self):
-        self.bundle().write("V", "filament/filaments_color_codes.json",
-                            {"data": [], "total": 0})
+        self.bundle().write("V", "filament/filaments_color_codes.json", {"data": [], "total": 0})
         errors, _gaps, out = self.coverage()
         self.assertEqual(errors, 0, out)
 
@@ -822,12 +841,11 @@ class TestCheck(TreeCase):
     def test_the_remedy_is_printed_once_not_once_per_file(self):
         self.bundle()
         for n in range(5):
-            self.t.write("V", f"filament/Stray{n}.json",
-                         {"type": "filament", "name": f"Stray{n}"})
+            self.t.write("V", f"filament/Stray{n}.json", {"type": "filament", "name": f"Stray{n}"})
         self.t.write("V", "filament/NoType.json", {"name": "NoType"})
         rc, out = self.run_command("check")
         self.assertEqual(rc, 1, out)
-        self.assertEqual(out.count("update-index\" to add them"), 1, out)
+        self.assertEqual(out.count('update-index" to add them'), 1, out)
         self.assertEqual(out.count("or delete them"), 1, out)
         self.assertIn("5 unreferenced file(s)", out)
         self.assertIn("1 unreferenced file(s)", out)
@@ -837,8 +855,7 @@ class TestCheck(TreeCase):
         # only shows up in a pass that has seen the whole tree.
         shared = apt.generate_preset_setting_id("V", "filament", "A")
         for rel in ("filament/A.json", "filament/nested/A.json"):
-            self.t.write("V", rel, {"type": "filament", "name": "A",
-                                    "instantiation": "true", "setting_id": shared})
+            self.t.write("V", rel, {"type": "filament", "name": "A", "instantiation": "true", "setting_id": shared})
         buf = io.StringIO()
         with contextlib.redirect_stdout(buf):
             errors = apt.check_setting_id_uniqueness(self.t.profiles)
@@ -846,9 +863,16 @@ class TestCheck(TreeCase):
         self.assertIn("globally unique", buf.getvalue())
 
     def test_a_base_profile_must_not_carry_a_setting_id(self):
-        self.t.write("V", "filament/base.json", {
-            "type": "filament", "name": "base", "instantiation": "false",
-            "setting_id": apt.generate_preset_setting_id("V", "filament", "base")})
+        self.t.write(
+            "V",
+            "filament/base.json",
+            {
+                "type": "filament",
+                "name": "base",
+                "instantiation": "false",
+                "setting_id": apt.generate_preset_setting_id("V", "filament", "base"),
+            },
+        )
         buf = io.StringIO()
         with contextlib.redirect_stdout(buf):
             errors = apt.check_setting_id_uniqueness(self.t.profiles)
@@ -859,6 +883,7 @@ class TestCheck(TreeCase):
 # ---------------------------------------------------------------------------
 # check: normalize and update-index would change nothing
 # ---------------------------------------------------------------------------
+
 
 class TestNormalized(TreeCase):
     """The pass that holds a bundle to the shape normalize and update-index write."""
@@ -924,8 +949,7 @@ class TestNormalized(TreeCase):
         self.assertEqual(gaps["stale_index"], 0, out)
 
     def test_a_bundle_with_no_index_still_has_its_files_checked(self):
-        self.t.write("V", "filament/A.json",
-                     {"type": "filament", "name": "A", "is_custom_defined": "0"})
+        self.t.write("V", "filament/A.json", {"type": "filament", "name": "A", "is_custom_defined": "0"})
         os.remove(self.t.index_path("V"))
         errors, gaps, out = self.normalized()
         self.assertEqual(errors, 1, out)
@@ -935,17 +959,14 @@ class TestNormalized(TreeCase):
     def test_the_shared_base_bundle_is_covered_too(self):
         # normalize and update-index own the shape of every bundle, the shared
         # library included.
-        self.t.write(apt.OFL, "filament/A.json",
-                     {"type": "filament", "name": "A", "version": "01.00.00.00"})
+        self.t.write(apt.OFL, "filament/A.json", {"type": "filament", "name": "A", "version": "01.00.00.00"})
         rc, out = self.run_command("check")
         self.assertEqual(rc, 1, out)
         self.assertIn(f"{apt.OFL}/filament/A.json: normalize would remove version", out)
 
     def test_each_remedy_is_printed_once_for_the_whole_run(self):
         for n in range(3):
-            self.t.write("V", f"filament/A{n}.json",
-                         {"type": "filament", "name": f"A{n}",
-                          "version": "01.00.00.00"})
+            self.t.write("V", f"filament/A{n}.json", {"type": "filament", "name": f"A{n}", "version": "01.00.00.00"})
         self.t.write("W", "filament/B.json", {"type": "filament", "name": "B"})
         rc, out = self.run_command("check")
         self.assertEqual(rc, 1, out)
@@ -959,15 +980,19 @@ class TestNormalized(TreeCase):
 # CLI dispatch
 # ---------------------------------------------------------------------------
 
+
 class TestFixVariant(TreeCase):
     def test_cooling_arrays_require_one_value_per_declared_variant(self):
         keys = ("fan_min_speed", "fan_max_speed", "additional_cooling_fan_speed")
         variants = ["Direct Drive Standard", "Direct Drive High Flow", "Bowden Standard"]
         for width in (1, 2, 3, 4):
             with self.subTest(width=width):
-                self.preset("filament/F.json", instantiation="true",
-                            filament_extruder_variant=variants,
-                            **{key: ["20"] * width for key in keys})
+                self.preset(
+                    "filament/F.json",
+                    instantiation="true",
+                    filament_extruder_variant=variants,
+                    **{key: ["20"] * width for key in keys},
+                )
                 apt.load_vendor_configs.cache_clear()
                 errors, out = self.width_errors()
                 self.assertEqual(errors, 0 if width == 3 else len(keys), out)
@@ -986,8 +1011,9 @@ class TestFixVariant(TreeCase):
         dual = ["Direct Drive Standard", "Direct Drive High Flow"]
         self.preset("process/common.json", instantiation="false", outer_wall_speed=common)
         self.preset("process/single.json", inherits="common", instantiation="false")
-        self.preset("process/dual.json", inherits="common", instantiation="false",
-                    print_extruder_variant=dual, print_extruder_id=["1", "1"])
+        self.preset(
+            "process/dual.json", inherits="common", instantiation="false", print_extruder_variant=dual, print_extruder_id=["1", "1"]
+        )
         for name, base in (("S1", "single"), ("S2", "single"), ("D1", "dual")):
             self.preset(f"process/{name}.json", inherits=base, instantiation="true")
 
@@ -999,29 +1025,45 @@ class TestFixVariant(TreeCase):
 
     def test_a_machine_without_a_variant_list_has_one_variant_per_extruder(self):
         # extruder_variant_list defaults to one "Direct Drive Standard" per extruder.
-        self.preset("machine/M.json", instantiation="true", nozzle_diameter=["0.4", "0.4"],
-                    retraction_length=["0.8", "1.2"], z_hop=["0.4"],
-                    machine_max_speed_x=["500", "200"])
+        self.preset(
+            "machine/M.json",
+            instantiation="true",
+            nozzle_diameter=["0.4", "0.4"],
+            retraction_length=["0.8", "1.2"],
+            z_hop=["0.4"],
+            machine_max_speed_x=["500", "200"],
+        )
         errors, out = self.width_errors()
         self.assertEqual(errors, 2, out)
-        self.assertIn('M.json: "z_hop" has 1 values for variant length 2 (no '
-                      'printer_extruder_variant, so one default variant per extruder) at stride 1, '
-                      'which takes 2', out)
+        self.assertIn(
+            'M.json: "z_hop" has 1 values for variant length 2 (no '
+            "printer_extruder_variant, so one default variant per extruder) at stride 1, "
+            "which takes 2",
+            out,
+        )
         self.assertIn('M.json: "machine_max_speed_x" has 2 values for variant length 2', out)
         self.assertNotIn("retraction_length", out)
 
     def test_one_value_is_an_error_where_the_list_has_more_variants(self):
-        self.preset("process/P.json", instantiation="true", outer_wall_speed=["30"],
-                    print_extruder_id=["1", "1"],
-                    print_extruder_variant=["Direct Drive Standard", "Direct Drive High Flow"])
+        self.preset(
+            "process/P.json",
+            instantiation="true",
+            outer_wall_speed=["30"],
+            print_extruder_id=["1", "1"],
+            print_extruder_variant=["Direct Drive Standard", "Direct Drive High Flow"],
+        )
         errors, out = self.width_errors()
         self.assertEqual(errors, 1, out)
-        self.assertIn('P.json: "outer_wall_speed" has 1 values for variant length 2 at stride 1, '
-                      'which takes 2', out)
+        self.assertIn('P.json: "outer_wall_speed" has 1 values for variant length 2 at stride 1, which takes 2', out)
 
     def test_one_value_is_padded_to_every_variant(self):
-        self.preset("machine/M.json", instantiation="true", nozzle_diameter=["0.4"] * 3,
-                    retraction_length=["0.8"], machine_max_speed_x=["500", "200"])
+        self.preset(
+            "machine/M.json",
+            instantiation="true",
+            nozzle_diameter=["0.4"] * 3,
+            retraction_length=["0.8"],
+            machine_max_speed_x=["500", "200"],
+        )
         rc, out = self.run_command("fix-variant")
         self.assertEqual(rc, 0, out)
         machine = self.t.read("V", "machine/M.json")
@@ -1030,8 +1072,12 @@ class TestFixVariant(TreeCase):
         self.assertEqual(self.width_errors()[0], 0)
 
     def test_extruder_ids_are_left_to_check(self):
-        self.preset("process/P.json", instantiation="true", print_extruder_id=["1"],
-                    print_extruder_variant=["Direct Drive Standard", "Direct Drive High Flow"])
+        self.preset(
+            "process/P.json",
+            instantiation="true",
+            print_extruder_id=["1"],
+            print_extruder_variant=["Direct Drive Standard", "Direct Drive High Flow"],
+        )
         self.run_command("fix-variant")
         self.assertEqual(self.t.read("V", "process/P.json")["print_extruder_id"], ["1"])
         errors, out = self.width_errors()
@@ -1041,8 +1087,7 @@ class TestFixVariant(TreeCase):
     def test_a_base_is_judged_only_where_its_array_reaches_a_preset(self):
         # A leaf overriding the base's one-value limit passes in both modes.
         self.preset("machine/common.json", instantiation="false", machine_max_speed_x=["500"])
-        self.preset("machine/M.json", inherits="common", instantiation="true",
-                    machine_max_speed_x=["500", "200"])
+        self.preset("machine/M.json", inherits="common", instantiation="true", machine_max_speed_x=["500", "200"])
         self.assertEqual(self.width_errors()[0], 0)
         self.assertEqual(self.width_errors("strict")[0], 0)
 
@@ -1055,8 +1100,7 @@ class TestFixVariant(TreeCase):
         rc, out = self.run_command("fix-variant", "--strict")
         self.assertEqual(rc, 0, out)
         self.assertEqual(self.t.read("V", "process/single.json")["outer_wall_speed"], ["30"])
-        self.assertEqual(self.t.read("V", "process/common.json")["outer_wall_speed"],
-                         ["30", "40"])
+        self.assertEqual(self.t.read("V", "process/common.json")["outer_wall_speed"], ["30", "40"])
         self.assertNotIn("outer_wall_speed", self.t.read("V", "process/S1.json"))
         self.assertEqual(self.width_errors("strict")[0], 0)
 
@@ -1065,8 +1109,11 @@ class TestFixVariant(TreeCase):
         self.assertEqual(self.width_errors()[0], 0)
         errors, out = self.width_errors("strict")
         self.assertEqual(errors, 1, out)
-        self.assertIn('process/D1.json: "outer_wall_speed" has 1 values for variant length 2 at '
-                      'stride 1, which takes 2 (it comes from V/process/common.json)', out)
+        self.assertIn(
+            'process/D1.json: "outer_wall_speed" has 1 values for variant length 2 at '
+            "stride 1, which takes 2 (it comes from V/process/common.json)",
+            out,
+        )
         before = self.t.bytes_map()
         self.run_command("fix-variant")
         self.assertEqual(self.t.bytes_map(), before)
@@ -1079,9 +1126,13 @@ class TestFixVariant(TreeCase):
     def test_a_strict_array_never_lands_in_a_file_of_another_width(self):
         # common is list-less (width 1) and D2 inherits it directly, so D2 takes it.
         self.processes(["30"])
-        self.preset("process/D2.json", inherits="common", instantiation="true",
-                    print_extruder_variant=["Direct Drive Standard", "Direct Drive High Flow"],
-                    print_extruder_id=["1", "1"])
+        self.preset(
+            "process/D2.json",
+            inherits="common",
+            instantiation="true",
+            print_extruder_variant=["Direct Drive Standard", "Direct Drive High Flow"],
+            print_extruder_id=["1", "1"],
+        )
         self.run_command("fix-variant", "--strict")
         self.assertEqual(self.t.read("V", "process/D2.json")["outer_wall_speed"], ["30", "30"])
         self.assertEqual(self.t.read("V", "process/common.json")["outer_wall_speed"], ["30"])
@@ -1089,8 +1140,7 @@ class TestFixVariant(TreeCase):
 
     def test_extra_values_are_dropped_where_they_are_written(self):
         self.preset("process/base.json", instantiation="false", outer_wall_speed=["30", "0"])
-        self.preset("process/P1.json", inherits="base", instantiation="true",
-                    inner_wall_speed=["40", "0"])
+        self.preset("process/P1.json", inherits="base", instantiation="true", inner_wall_speed=["40", "0"])
         self.preset("process/P2.json", inherits="base", instantiation="true")
         self.run_command("fix-variant")
         self.assertEqual(self.t.read("V", "process/P1.json")["inner_wall_speed"], ["40"])
@@ -1100,15 +1150,21 @@ class TestFixVariant(TreeCase):
         self.assertNotIn("outer_wall_speed", self.t.read("V", "process/P1.json"))
 
     def test_the_rest_of_the_file_keeps_its_bytes(self):
-        self.t.write_raw("V", "process/P.json", b'{\n  "type": "process", "name": "P",\n'
-                         b'  "instantiation": "true",\n  "outer_wall_speed": ["30", "0"],\n'
-                         b'  "inner_wall_speed": [\n    "40",\n    "0"\n  ]\n}\n')
+        self.t.write_raw(
+            "V",
+            "process/P.json",
+            b'{\n  "type": "process", "name": "P",\n'
+            b'  "instantiation": "true",\n  "outer_wall_speed": ["30", "0"],\n'
+            b'  "inner_wall_speed": [\n    "40",\n    "0"\n  ]\n}\n',
+        )
         self.t.index("V", "process", "P", "process/P.json")
         self.run_command("fix-variant")
-        self.assertEqual(self.t.raw("V", "process/P.json"),
-                         b'{\n  "type": "process", "name": "P",\n'
-                         b'  "instantiation": "true",\n  "outer_wall_speed": ["30"],\n'
-                         b'  "inner_wall_speed": [\n    "40"\n  ]\n}\n')
+        self.assertEqual(
+            self.t.raw("V", "process/P.json"),
+            b'{\n  "type": "process", "name": "P",\n'
+            b'  "instantiation": "true",\n  "outer_wall_speed": ["30"],\n'
+            b'  "inner_wall_speed": [\n    "40"\n  ]\n}\n',
+        )
 
     def test_a_dry_run_writes_nothing(self):
         self.processes(["30"])
@@ -1139,37 +1195,61 @@ class TestVariantNames(TreeCase):
         return errors, buf.getvalue()
 
     def test_a_legal_variant_layout_passes(self):
-        self.preset("machine/M.json", instantiation="true", nozzle_diameter=["0.4"],
-                    extruder_type=["Direct Drive"],
-                    extruder_variant_list=["Direct Drive Standard,Direct Drive High Flow"],
-                    printer_extruder_id=["1", "1"],
-                    printer_extruder_variant=["Direct Drive Standard",
-                                              "Direct Drive High Flow"],
-                    nozzle_volume_type=["High Flow"],
-                    default_nozzle_volume_type=["Standard"])
-        self.preset("process/P.json", instantiation="true", print_extruder_id=["1", "1"],
-                    print_extruder_variant=["Direct Drive Standard",
-                                            "Direct Drive High Flow"])
-        self.preset("filament/F.json", instantiation="true",
-                    filament_extruder_variant=["Direct Drive Standard", "Bowden High Flow"])
+        self.preset(
+            "machine/M.json",
+            instantiation="true",
+            nozzle_diameter=["0.4"],
+            extruder_type=["Direct Drive"],
+            extruder_variant_list=["Direct Drive Standard,Direct Drive High Flow"],
+            printer_extruder_id=["1", "1"],
+            printer_extruder_variant=["Direct Drive Standard", "Direct Drive High Flow"],
+            nozzle_volume_type=["High Flow"],
+            default_nozzle_volume_type=["Standard"],
+        )
+        self.preset(
+            "process/P.json",
+            instantiation="true",
+            print_extruder_id=["1", "1"],
+            print_extruder_variant=["Direct Drive Standard", "Direct Drive High Flow"],
+        )
+        self.preset(
+            "filament/F.json", instantiation="true", filament_extruder_variant=["Direct Drive Standard", "Bowden High Flow"]
+        )
         self.assertEqual(self.names()[0], 0, self.names()[1])
 
     def test_a_variant_the_enum_cannot_build_is_an_error(self):
         # An unknown volume type, in a list and in a menu, an extruder type that is not
         # one, and the legacy extruder spelling that is rewritten in extruder_type alone.
-        cases = (("process/P1.json", "print_extruder_variant", "Direct Drive Fast",
-                  'entry 1 holds "Direct Drive Fast"',
-                  "not a nozzle volume type the enum has"),
-                 ("machine/M.json", "extruder_variant_list",
-                  "Direct Drive Standard,Direct Drive Fast",
-                  'extruder 1 holds "Direct Drive Fast"',
-                  "not a nozzle volume type the enum has"),
-                 ("process/P2.json", "print_extruder_variant", "DD Standard",
-                  'entry 1 holds "DD Standard"',
-                  "does not start with an extruder type the enum has"),
-                 ("filament/F.json", "filament_extruder_variant", "DirectDrive Standard",
-                  'entry 1 holds "DirectDrive Standard"',
-                  "does not start with an extruder type the enum has"))
+        cases = (
+            (
+                "process/P1.json",
+                "print_extruder_variant",
+                "Direct Drive Fast",
+                'entry 1 holds "Direct Drive Fast"',
+                "not a nozzle volume type the enum has",
+            ),
+            (
+                "machine/M.json",
+                "extruder_variant_list",
+                "Direct Drive Standard,Direct Drive Fast",
+                'extruder 1 holds "Direct Drive Fast"',
+                "not a nozzle volume type the enum has",
+            ),
+            (
+                "process/P2.json",
+                "print_extruder_variant",
+                "DD Standard",
+                'entry 1 holds "DD Standard"',
+                "does not start with an extruder type the enum has",
+            ),
+            (
+                "filament/F.json",
+                "filament_extruder_variant",
+                "DirectDrive Standard",
+                'entry 1 holds "DirectDrive Standard"',
+                "does not start with an extruder type the enum has",
+            ),
+        )
         for rel, key, value, _held, _why in cases:
             self.preset(rel, instantiation="false", **{key: [value]})
         errors, out = self.names()
@@ -1179,31 +1259,34 @@ class TestVariantNames(TreeCase):
             self.assertIn(why, out)
 
     def test_the_legacy_names_the_loader_rewrites_are_errors(self):
-        self.preset("machine/M.json", extruder_type=["DirectDrive"],
-                    nozzle_volume_type=["Big Traffic"],
-                    default_nozzle_volume_type=["Normal"],
-                    printer_extruder_variant=["Direct Drive Big Traffic"])
+        self.preset(
+            "machine/M.json",
+            extruder_type=["DirectDrive"],
+            nozzle_volume_type=["Big Traffic"],
+            default_nozzle_volume_type=["Normal"],
+            printer_extruder_variant=["Direct Drive Big Traffic"],
+        )
         errors, out = self.names()
         self.assertEqual(errors, 4, out)
-        self.assertIn('extruder_type spells the legacy name "DirectDrive"; the loader '
-                      'still rewrites it to "Direct Drive"', out)
-        self.assertIn('V/machine/M.json: nozzle_volume_type spells the legacy name '
-                      '"Big Traffic"', out)
+        self.assertIn('extruder_type spells the legacy name "DirectDrive"; the loader still rewrites it to "Direct Drive"', out)
+        self.assertIn('V/machine/M.json: nozzle_volume_type spells the legacy name "Big Traffic"', out)
         self.assertIn('default_nozzle_volume_type spells the legacy name "Normal"', out)
         self.assertIn('holds the legacy variant "Direct Drive Big Traffic"', out)
         self.assertIn('a profile writes the enum name: "Direct Drive High Flow"', out)
 
     def test_an_empty_entry_is_an_error(self):
-        self.preset("filament/F.json",
-                    filament_extruder_variant=["Direct Drive Standard", ""])
+        self.preset("filament/F.json", filament_extruder_variant=["Direct Drive Standard", ""])
         errors, out = self.names()
         self.assertEqual(errors, 1, out)
         self.assertIn("filament_extruder_variant entry 2 is empty", out)
 
     def test_hybrid_is_runtime_only(self):
-        self.preset("machine/M.json", nozzle_volume_type=["Hybrid"],
-                    default_nozzle_volume_type=["Hybrid"],
-                    printer_extruder_variant=["Direct Drive Hybrid"])
+        self.preset(
+            "machine/M.json",
+            nozzle_volume_type=["Hybrid"],
+            default_nozzle_volume_type=["Hybrid"],
+            printer_extruder_variant=["Direct Drive Hybrid"],
+        )
         errors, out = self.names()
         self.assertEqual(errors, 3, out)
         self.assertIn("Hybrid names the sub-nozzles of one hybrid extruder at runtime", out)
@@ -1212,66 +1295,74 @@ class TestVariantNames(TreeCase):
 
     def test_bbl_is_held_to_the_enums_like_every_bundle(self):
         # E3D High Flow passes because the engine's enum has it; TPU285 is a name no enum has.
-        self.preset("machine/M.json", vendor="BBL", extruder_type=["Direct Drive"],
-                    extruder_variant_list=["Direct Drive Standard,Direct Drive E3D High Flow"],
-                    printer_extruder_id=["1", "1"],
-                    printer_extruder_variant=["Direct Drive Standard",
-                                              "Direct Drive E3D High Flow"])
-        self.preset("process/P.json", vendor="BBL", instantiation="true",
-                    print_extruder_variant=["Direct Drive TPU285"])
+        self.preset(
+            "machine/M.json",
+            vendor="BBL",
+            extruder_type=["Direct Drive"],
+            extruder_variant_list=["Direct Drive Standard,Direct Drive E3D High Flow"],
+            printer_extruder_id=["1", "1"],
+            printer_extruder_variant=["Direct Drive Standard", "Direct Drive E3D High Flow"],
+        )
+        self.preset("process/P.json", vendor="BBL", instantiation="true", print_extruder_variant=["Direct Drive TPU285"])
         errors, out = self.names("BBL")
         self.assertEqual(errors, 1, out)
         self.assertNotIn('holds "Direct Drive E3D High Flow"', out)
         self.assertIn('"TPU285" is not a nozzle volume type the enum has', out)
 
     def test_a_list_may_not_name_one_variant_twice(self):
-        self.preset("filament/F.json",
-                    filament_extruder_variant=["Direct Drive Standard",
-                                               "Direct Drive High Flow",
-                                               "Direct Drive Standard"])
-        self.preset("machine/M.json",
-                    extruder_variant_list=["Direct Drive Standard,Direct Drive Standard,"
-                                           "Direct Drive High Flow"])
-        self.preset("process/P.json", print_extruder_id=["1", "1", "1"],
-                    print_extruder_variant=["Direct Drive Standard", "Direct Drive High Flow",
-                                            "Direct Drive Standard"])
+        self.preset(
+            "filament/F.json",
+            filament_extruder_variant=["Direct Drive Standard", "Direct Drive High Flow", "Direct Drive Standard"],
+        )
+        self.preset("machine/M.json", extruder_variant_list=["Direct Drive Standard,Direct Drive Standard,Direct Drive High Flow"])
+        self.preset(
+            "process/P.json",
+            print_extruder_id=["1", "1", "1"],
+            print_extruder_variant=["Direct Drive Standard", "Direct Drive High Flow", "Direct Drive Standard"],
+        )
         errors, out = self.names()
         self.assertEqual(errors, 3, out)
         self.assertIn('filament_extruder_variant lists "Direct Drive Standard" 2 times', out)
-        self.assertIn('extruder_variant_list extruder 1 lists "Direct Drive Standard" 2 '
-                      "times", out)
-        self.assertIn('print_extruder_variant lists the pair (extruder 1, "Direct Drive '
-                      'Standard") 2 times', out)
+        self.assertIn('extruder_variant_list extruder 1 lists "Direct Drive Standard" 2 times', out)
+        self.assertIn('print_extruder_variant lists the pair (extruder 1, "Direct Drive Standard") 2 times', out)
 
     def test_one_variant_on_two_extruders_is_two_pairs_not_a_repeat(self):
-        self.preset("process/P.json", print_extruder_id=["1", "2"],
-                    print_extruder_variant=["Direct Drive Standard",
-                                            "Direct Drive Standard"])
+        self.preset(
+            "process/P.json",
+            print_extruder_id=["1", "2"],
+            print_extruder_variant=["Direct Drive Standard", "Direct Drive Standard"],
+        )
         self.assertEqual(self.names()[0], 0, self.names()[1])
 
     def test_an_unknown_enum_value_fails_the_bundle(self):
-        self.preset("machine/M.json", extruder_type=["Direct Drive", "Magnetic Drive"],
-                    nozzle_volume_type=["Turbo"],
-                    default_nozzle_volume_type=["Fast Flow"])
+        self.preset(
+            "machine/M.json",
+            extruder_type=["Direct Drive", "Magnetic Drive"],
+            nozzle_volume_type=["Turbo"],
+            default_nozzle_volume_type=["Fast Flow"],
+        )
         errors, out = self.names()
         self.assertEqual(errors, 3, out)
-        self.assertIn('extruder_type "Magnetic Drive" is not one of (Bowden, Direct Drive)',
-                      out)
-        self.assertIn('V/machine/M.json: nozzle_volume_type "Turbo" is not one of (E3D High '
-                      "Flow, Extra High Flow, High Flow, Standard, TPU High Flow)", out)
-        self.assertIn('default_nozzle_volume_type "Fast Flow" is not one of (E3D High Flow, '
-                      "Extra High Flow, High Flow, Standard, TPU High Flow)", out)
+        self.assertIn('extruder_type "Magnetic Drive" is not one of (Bowden, Direct Drive)', out)
+        self.assertIn(
+            'V/machine/M.json: nozzle_volume_type "Turbo" is not one of (E3D High '
+            "Flow, Extra High Flow, High Flow, Standard, TPU High Flow)",
+            out,
+        )
+        self.assertIn(
+            'default_nozzle_volume_type "Fast Flow" is not one of (E3D High Flow, '
+            "Extra High Flow, High Flow, Standard, TPU High Flow)",
+            out,
+        )
 
     def test_a_file_no_list_references_is_not_judged(self):
         # It never loads, so its variant names cannot reach anything;
         # check_index_coverage reports the file itself.
-        self.t.write("V", "machine/M.json", {"type": "machine", "name": "M",
-                                             "printer_extruder_variant": ["Direct Drive Fast"]})
+        self.t.write("V", "machine/M.json", {"type": "machine", "name": "M", "printer_extruder_variant": ["Direct Drive Fast"]})
         self.assertEqual(self.names()[0], 0, self.names()[1])
 
     def test_check_runs_it(self):
-        self.preset("filament/F.json", instantiation="false",
-                    filament_extruder_variant=["Direct Drive Normal"])
+        self.preset("filament/F.json", instantiation="false", filament_extruder_variant=["Direct Drive Normal"])
         self.run_command("update-index")  # so nothing but the name check can fail
         rc, out = self.run_command("check")
         self.assertEqual(rc, 1, out)
@@ -1281,6 +1372,7 @@ class TestVariantNames(TreeCase):
 # ---------------------------------------------------------------------------
 # legacy-compat
 # ---------------------------------------------------------------------------
+
 
 class TestLegacyCompat(unittest.TestCase):
     """A base release and the current tree, each with one vendor."""
@@ -1292,15 +1384,23 @@ class TestLegacyCompat(unittest.TestCase):
 
     @staticmethod
     def printer(tree, name, **extra):
-        tree.write("V", f"machine/{name}.json",
-                   {"type": "machine", "name": name, "instantiation": "true", **extra})
+        tree.write("V", f"machine/{name}.json", {"type": "machine", "name": name, "instantiation": "true", **extra})
         tree.index("V", "machine", name, f"machine/{name}.json")
 
     @staticmethod
     def filament(tree, name, printers, filament_id="OFpetg01", **extra):
-        tree.write("V", f"filament/{name}.json",
-                   {"type": "filament", "name": name, "instantiation": "true",
-                    "filament_id": filament_id, "compatible_printers": printers, **extra})
+        tree.write(
+            "V",
+            f"filament/{name}.json",
+            {
+                "type": "filament",
+                "name": name,
+                "instantiation": "true",
+                "filament_id": filament_id,
+                "compatible_printers": printers,
+                **extra,
+            },
+        )
         tree.index("V", "filament", name, f"filament/{name}.json")
 
     def generate(self):
@@ -1360,8 +1460,7 @@ class TestLegacyCompat(unittest.TestCase):
             self.printer(tree, "Direct 0.4", printer_extruder_variant=["Direct Drive Standard"])
             self.printer(tree, "Bowden 0.4", printer_extruder_variant=["Bowden Standard"])
         self.filament(self.base, "PETG @all", ["Direct 0.4", "Bowden 0.4"])
-        self.filament(self.cur, "PETG @all", ["Direct 0.4"],
-                      filament_extruder_variant=["Direct Drive Standard"])
+        self.filament(self.cur, "PETG @all", ["Direct 0.4"], filament_extruder_variant=["Direct Drive Standard"])
         self.filament(self.cur, "PETG @Bowden", ["Bowden 0.4"])
         self.assertEqual(self.generate(), {})
 
@@ -1380,8 +1479,7 @@ class TestLegacyCompat(unittest.TestCase):
         self.filament(self.cur, "PETG @A", ["A 0.6"])
         self.filament(self.cur, "PETG @A 0.4", ["A 0.4"])
         output = os.path.join(self.cur.dir, "map.json")
-        argv = ["legacy-compat", "--base", self.base.profiles, "--profiles", self.cur.profiles,
-                "--output", output]
+        argv = ["legacy-compat", "--base", self.base.profiles, "--profiles", self.cur.profiles, "--output", output]
         with contextlib.redirect_stdout(io.StringIO()):
             self.assertEqual(apt.main(argv), 0)
             self.assertEqual(apt.main(argv + ["--check"]), 0)
@@ -1393,24 +1491,30 @@ class TestLegacyCompat(unittest.TestCase):
 class TestDispatch(TreeCase):
     def test_each_command_reaches_its_own_writer(self):
         self.t.write("V", "filament/A.json", {"type": "filament", "name": "A"})
-        for command, expected in (("normalize", "normalized"),
-                                  ("fix-variant", "resized"),
-                                  ("trim", "unreferenced"),
-                                  ("update-index", "vendor index")):
+        for command, expected in (
+            ("normalize", "normalized"),
+            ("fix-variant", "resized"),
+            ("trim", "unreferenced"),
+            ("update-index", "vendor index"),
+        ):
             with self.subTest(command=command):
                 rc, out = self.run_command(command, "--dry-run")
                 self.assertEqual(rc, 0, out)
                 self.assertIn(expected, out)
 
     def test_an_option_belongs_to_one_command_only(self):
-        for argv in (["trim", "--force"],
-                     ["update-index", "--filament-id"],
-                     ["check", "--profile-type", "filament"],
-                     ["normalize", "--strict"]):
+        for argv in (
+            ["trim", "--force"],
+            ["update-index", "--filament-id"],
+            ["check", "--profile-type", "filament"],
+            ["normalize", "--strict"],
+        ):
             with self.subTest(argv=argv):
-                with self.assertRaises(SystemExit) as cm, \
-                        contextlib.redirect_stdout(io.StringIO()), \
-                        contextlib.redirect_stderr(io.StringIO()):
+                with (
+                    self.assertRaises(SystemExit) as cm,
+                    contextlib.redirect_stdout(io.StringIO()),
+                    contextlib.redirect_stderr(io.StringIO()),
+                ):
                     apt.main([*argv, "--profiles", self.t.profiles])
                 self.assertEqual(cm.exception.code, 2)
 
@@ -1433,13 +1537,17 @@ class TestDispatch(TreeCase):
 # gcode-diff
 # ---------------------------------------------------------------------------
 
+
 @unittest.skipUnless(shutil.which("git"), "git not installed")
 class GitTreeCase(TreeCase):
     """A tree that is a git repository, for the commands that diff two revisions."""
 
     def git(self, *args):
-        subprocess.run(["git", "-C", self.t.dir, "-c", "user.name=t", "-c", "user.email=t@t",
-                        "-c", "commit.gpgsign=false", *args], check=True, capture_output=True)
+        subprocess.run(
+            ["git", "-C", self.t.dir, "-c", "user.name=t", "-c", "user.email=t@t", "-c", "commit.gpgsign=false", *args],
+            check=True,
+            capture_output=True,
+        )
 
     def commit(self):
         self.git("add", "-A")
@@ -1450,9 +1558,11 @@ class GitTreeCase(TreeCase):
         # git's list of the variables that tie a process to a repository, asked with no
         # GIT_* set since a stray GIT_DIR fails the query.
         clean = {k: v for k, v in os.environ.items() if not k.startswith("GIT_")}
-        cls.repo_env_vars = set(subprocess.run(
-            ["git", "rev-parse", "--local-env-vars"], env=clean, check=True,
-            capture_output=True, text=True).stdout.split())
+        cls.repo_env_vars = set(
+            subprocess.run(
+                ["git", "rev-parse", "--local-env-vars"], env=clean, check=True, capture_output=True, text=True
+            ).stdout.split()
+        )
 
     def setUp(self):
         super().setUp()
@@ -1489,8 +1599,7 @@ class TestGcodeDiff(GitTreeCase):
         self.printer("C", machine_start_gcode="G28\nM104 S220\nG1 Z5")
         out = self.diff()
         self.assertEqual(out.count("<details>"), 2)
-        self.assertIn("<code>V/machine/A.json</code>, <code>V/machine/B.json</code> - "
-                      "<code>machine_start_gcode</code>", out)
+        self.assertIn("<code>V/machine/A.json</code>, <code>V/machine/B.json</code> - <code>machine_start_gcode</code>", out)
         self.assertIn("<code>V/machine/C.json</code> - <code>machine_start_gcode</code>", out)
         # Trailing spaces are removed.
         self.assertIn("\n-M104 S200\n+M104 S210\n", out)
@@ -1555,12 +1664,10 @@ class TestGcodeDiff(GitTreeCase):
         self.assertIn("@@ -0,0 +1,3 @@\n+G28\n+M104 S200\n+G1 Z5\n", out)
 
     def test_a_batch_read_survives_paths_that_are_not_files(self):
-        blobs = apt._blobs_at(self.t.profiles, [("HEAD", "V/machine"), ("HEAD", "V/no such.json"),
-                                                ("HEAD", "V/machine/Gone.json")])
+        blobs = apt._blobs_at(self.t.profiles, [("HEAD", "V/machine"), ("HEAD", "V/no such.json"), ("HEAD", "V/machine/Gone.json")])
         self.assertIsNone(blobs[("HEAD", "V/machine")])
         self.assertIsNone(blobs[("HEAD", "V/no such.json")])
-        self.assertEqual(json.loads(blobs[("HEAD", "V/machine/Gone.json")])["machine_end_gcode"],
-                         "M84")
+        self.assertEqual(json.loads(blobs[("HEAD", "V/machine/Gone.json")])["machine_end_gcode"], "M84")
 
     def test_each_value_of_a_vector_option_is_its_own_setting(self):
         self.t.write("V", "filament/F.json", {"filament_start_gcode": ["M106", "M107"]})
@@ -1584,8 +1691,7 @@ class TestGcodeDiff(GitTreeCase):
         data = self.t.read("W", "machine/A.json")
         self.t.write("W", "machine/A.json", {**data, "machine_start_gcode": "G28\nM104 S210\nG1 Z5"})
         self.commit()
-        rc, out = self.run_command("gcode-diff", "--base", "HEAD~1", "--head", "HEAD",
-                                   "--vendor", "V")
+        rc, out = self.run_command("gcode-diff", "--base", "HEAD~1", "--head", "HEAD", "--vendor", "V")
         self.assertEqual(rc, 0, out)
         self.assertIn("<code>W/machine/A.json</code> - <code>machine_start_gcode</code>", out)
 
@@ -1603,8 +1709,7 @@ class TestGcodeDiff(GitTreeCase):
         summary, out = self.same_edit("ABCDE")
         self.assertIn("<code>V/machine/C.json</code> and 2 more - ", summary)
         self.assertNotIn("D.json", summary)
-        self.assertIn("<code>V/machine/D.json</code>, <code>V/machine/E.json</code></p>\n\n```diff",
-                      out)
+        self.assertIn("<code>V/machine/D.json</code>, <code>V/machine/E.json</code></p>\n\n```diff", out)
 
     def test_four_files_are_all_named_in_the_summary(self):
         summary, _out = self.same_edit("ABCD")
@@ -1622,8 +1727,7 @@ class TestGcodeDiff(GitTreeCase):
     def test_a_file_name_that_is_not_utf8_is_an_error(self):
         bad = UnicodeDecodeError("utf-8", b"\xe9.json", 0, 1, "invalid continuation byte")
         err = io.StringIO()
-        with mock.patch.object(apt, "_changed_profiles", side_effect=bad), \
-                contextlib.redirect_stderr(err):
+        with mock.patch.object(apt, "_changed_profiles", side_effect=bad), contextlib.redirect_stderr(err):
             rc, out = self.run_command("gcode-diff", "--base", "HEAD")
         self.assertEqual((rc, out), (1, ""))
         self.assertIn("invalid continuation byte", err.getvalue())
@@ -1674,16 +1778,19 @@ class TestGcodeDiff(GitTreeCase):
     def test_a_git_hook_environment_is_ignored(self):
         scripts = os.path.join(REPO_ROOT, "scripts")
         result = subprocess.run(
-            [sys.executable, "-m", "unittest",
-             "tests.test_profile_tool.TestGcodeDiff.test_head_compares_two_commits"],
-            cwd=scripts, capture_output=True, text=True,
-            env={**os.environ, "GIT_DIR": os.path.join(self.t.dir, "nowhere")})
+            [sys.executable, "-m", "unittest", "tests.test_profile_tool.TestGcodeDiff.test_head_compares_two_commits"],
+            cwd=scripts,
+            capture_output=True,
+            text=True,
+            env={**os.environ, "GIT_DIR": os.path.join(self.t.dir, "nowhere")},
+        )
         self.assertEqual(result.returncode, 0, result.stderr)
 
     def test_the_options_are_read_from_the_engine(self):
         keys = apt._text_option_keys()
-        self.assertTrue({"machine_start_gcode", "filament_start_gcode", "printing_by_object_gcode",
-                         "notes", "post_process"} <= keys)
+        self.assertTrue(
+            {"machine_start_gcode", "filament_start_gcode", "printing_by_object_gcode", "notes", "post_process"} <= keys
+        )
         self.assertNotIn("emit_machine_limits_to_gcode", keys)  # a coBool
 
     START_DEF = 'def = this->add("machine_start_gcode", coString);\n'
@@ -1697,19 +1804,20 @@ class TestGcodeDiff(GitTreeCase):
                     f.write(text)
         apt._text_option_keys.cache_clear()
         self.addCleanup(apt._text_option_keys.cache_clear)
-        with mock.patch.object(apt, "PRINT_CONFIG_CPP", paths[0]), \
-                mock.patch.object(apt, "TAB_CPP", paths[1]):
+        with mock.patch.object(apt, "PRINT_CONFIG_CPP", paths[0]), mock.patch.object(apt, "TAB_CPP", paths[1]):
             return apt._text_option_keys()
 
     def test_multiline_is_read_whatever_its_spacing(self):
-        keys = self.keys_from(self.START_DEF + 'def = this->add("printer_notes", coString);\n'
-                                               '    def->multiline  = true;\n')
+        keys = self.keys_from(self.START_DEF + 'def = this->add("printer_notes", coString);\n    def->multiline  = true;\n')
         self.assertIn("printer_notes", keys)
 
     def test_the_code_options_of_tab_cpp_are_read(self):
-        keys = self.keys_from(self.START_DEF, 'option = optgroup->get_option("filename_format");\n'
-                                              'option.opt.is_code = true;\n'
-                                              'option = optgroup->get_option("layer_height");\n')
+        keys = self.keys_from(
+            self.START_DEF,
+            'option = optgroup->get_option("filename_format");\n'
+            "option.opt.is_code = true;\n"
+            'option = optgroup->get_option("layer_height");\n',
+        )
         self.assertIn("filename_format", keys)
         self.assertNotIn("layer_height", keys)
 
@@ -1717,14 +1825,16 @@ class TestGcodeDiff(GitTreeCase):
         self.assertIn("machine_start_gcode", self.keys_from(self.START_DEF))
 
     def test_markdown_in_a_file_name_stays_literal(self):
-        section = apt._gcode_diff_section(["V/a *b*.json", "V/c.json", "V/d.json", "V/e.json",
-                                           "V/f.json"], "machine_start_gcode", "@@ -1 +1 @@")
+        section = apt._gcode_diff_section(
+            ["V/a *b*.json", "V/c.json", "V/d.json", "V/e.json", "V/f.json"], "machine_start_gcode", "@@ -1 +1 @@"
+        )
         self.assertIn("\n<p><code>V/a *b*.json</code>, ", section)
 
 
 # ---------------------------------------------------------------------------
 # version-check
 # ---------------------------------------------------------------------------
+
 
 class TestVersionCheck(GitTreeCase):
     def index(self, vendor, version, **extra):
@@ -1744,8 +1854,11 @@ class TestVersionCheck(GitTreeCase):
         self.t.write("V", "machine/A.json", {"type": "machine", "name": "A", "x": "1"})
         rc, out = self.check()
         self.assertEqual(rc, 1)
-        self.assertIn("V.json: version 01.00.00.00 was not bumped, but 1 file of the bundle "
-                      "changed (V/machine/A.json); bump it to 01.00.00.01", out)
+        self.assertIn(
+            "V.json: version 01.00.00.00 was not bumped, but 1 file of the bundle "
+            "changed (V/machine/A.json); bump it to 01.00.00.01",
+            out,
+        )
 
     def test_a_bumped_bundle_passes(self):
         self.t.write("V", "machine/A.json", {"type": "machine", "name": "A", "x": "1"})
@@ -1765,8 +1878,7 @@ class TestVersionCheck(GitTreeCase):
         rc, out = self.check()
         self.assertEqual(rc, 1)
         self.assertIn("V.json: version 01.00.00.00 was not bumped", out)
-        self.assertIn("W.json: version 01.00.00.00 was not bumped, but 1 file of the bundle "
-                      "changed (W/machine/A.json)", out)
+        self.assertIn("W.json: version 01.00.00.00 was not bumped, but 1 file of the bundle changed (W/machine/A.json)", out)
 
     def test_a_file_moved_between_bundles_changes_both(self):
         os.rename(self.t.path("V", "machine/A.json"), self.t.path("W", "machine/B.json"))
@@ -1775,8 +1887,7 @@ class TestVersionCheck(GitTreeCase):
         rc, out = self.run_command("version-check", "--base", "HEAD~1", "--head", "HEAD")
         self.assertEqual(rc, 1)
         self.assertIn("W: 01.00.00.00 -> 01.00.00.01, 2 files changed", out)
-        self.assertIn("V.json: version 01.00.00.00 was not bumped, but 1 file of the bundle "
-                      "changed (V/machine/A.json)", out)
+        self.assertIn("V.json: version 01.00.00.00 was not bumped, but 1 file of the bundle changed (V/machine/A.json)", out)
 
     def test_a_deleted_index_with_files_left_is_an_error(self):
         os.remove(self.t.index_path("V"))
@@ -1816,8 +1927,11 @@ class TestVersionCheck(GitTreeCase):
         self.index("V", "00.09.00.00")
         rc, out = self.check()
         self.assertEqual(rc, 1)
-        self.assertIn("V.json: version 00.09.00.00 is not newer than 01.00.00.00 at HEAD, but "
-                      "1 file of the bundle changed (V.json); bump it to 01.00.00.01", out)
+        self.assertIn(
+            "V.json: version 00.09.00.00 is not newer than 01.00.00.00 at HEAD, but "
+            "1 file of the bundle changed (V.json); bump it to 01.00.00.01",
+            out,
+        )
 
     def test_the_fourth_component_folds_into_the_third(self):
         # The app reads both as 1.0.100, so this is not a bump.
@@ -1833,8 +1947,7 @@ class TestVersionCheck(GitTreeCase):
             self.index("V", version)
             rc, out = self.check()
             self.assertEqual(rc, 1, version)
-            self.assertIn(f'V.json: version "{version}" in the working tree is not four '
-                          "numbers (MM.mm.pp.bb)", out)
+            self.assertIn(f'V.json: version "{version}" in the working tree is not four numbers (MM.mm.pp.bb)', out)
 
     def test_a_three_part_base_version_is_still_compared(self):
         self.index("V", "1.0.0")
@@ -1883,9 +1996,13 @@ class TestVersionCheck(GitTreeCase):
         self.assertIn("no-such-ref", out)
 
     def test_next_version(self):
-        for version, after in (("02.04.00.16", "02.04.00.17"), ("02.03.02.99", "02.03.03.00"),
-                               ("01.00.00.9", "01.00.00.10"), ("2.4.0.05", "2.4.0.06"),
-                               ("1.0.0", "1.0.0.01")):
+        for version, after in (
+            ("02.04.00.16", "02.04.00.17"),
+            ("02.03.02.99", "02.03.03.00"),
+            ("01.00.00.9", "01.00.00.10"),
+            ("2.4.0.05", "2.4.0.06"),
+            ("1.0.0", "1.0.0.01"),
+        ):
             self.assertEqual(apt.next_version(version), after)
 
     def test_version_key(self):
@@ -1899,6 +2016,7 @@ class TestVersionCheck(GitTreeCase):
 # ---------------------------------------------------------------------------
 # the real tree
 # ---------------------------------------------------------------------------
+
 
 @unittest.skipUnless(os.path.isdir(REAL_PROFILES), "resources/profiles not present")
 class TestRealTree(unittest.TestCase):

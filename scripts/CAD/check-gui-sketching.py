@@ -16,15 +16,24 @@ Runs INSIDE the headless rig container (Xvfb :10 + openbox + the app with ORCA_C
 
 With no arguments every rung runs. Exit 0 = every property held.
 """
-import json, math, os, re, socket, subprocess, sys, time
 
-SOCK  = os.environ.get("ORCA_CAD_MCP", "/tmp/mcp.sock")
-DISP  = os.environ.get("DISPLAY", ":10")
+import json
+import math
+import os
+import re
+import socket
+import subprocess
+import sys
+import time
+
+SOCK = os.environ.get("ORCA_CAD_MCP", "/tmp/mcp.sock")
+DISP = os.environ.get("DISPLAY", ":10")
 _n = 0
 _fail = 0
 _checks = 0
 
 # ---------------------------------------------------------------- the instrument (read-only)
+
 
 def call(method, **params):
     global _n
@@ -32,8 +41,7 @@ def call(method, **params):
     s = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
     s.settimeout(30)
     s.connect(SOCK)
-    s.sendall((json.dumps({"jsonrpc": "2.0", "id": _n, "method": method,
-                           "params": params}) + "\n").encode())
+    s.sendall((json.dumps({"jsonrpc": "2.0", "id": _n, "method": method, "params": params}) + "\n").encode())
     buf = b""
     while b"\n" not in buf:
         d = s.recv(65536)
@@ -60,6 +68,7 @@ def describe():
 # ---------------------------------------------------------------- the hand (synthetic input)
 
 _win = None
+
 
 def win():
     """The app window's id and origin. Asked fresh once per run: a relaunch changes the id."""
@@ -107,7 +116,7 @@ def typ(s, pause=0.35):
 
 def click(px, py, pause=0.45, btn=1):
     _, X, Y, _, _ = win()
-    xdo(f"mousemove {X+int(px)} {Y+int(py)} click --delay 120 {btn}")
+    xdo(f"mousemove {X + int(px)} {Y + int(py)} click --delay 120 {btn}")
     time.sleep(pause)
 
 
@@ -119,13 +128,13 @@ def click_ctrl(px, py, pause=0.45):
     silently arrives with one pick and is rejected for the wrong reason.
     """
     _, X, Y, _, _ = win()
-    xdo(f"keydown ctrl mousemove {X+int(px)} {Y+int(py)} click --delay 120 1 keyup ctrl")
+    xdo(f"keydown ctrl mousemove {X + int(px)} {Y + int(py)} click --delay 120 1 keyup ctrl")
     time.sleep(pause)
 
 
 def move(px, py, pause=0.2):
     _, X, Y, _, _ = win()
-    xdo(f"mousemove {X+int(px)} {Y+int(py)}")
+    xdo(f"mousemove {X + int(px)} {Y + int(py)}")
     time.sleep(pause)
 
 
@@ -140,8 +149,8 @@ def shot(path):
 # HOMOGRAPHY, not a scale: the same pixel span covers more millimetres at the far edge than at
 # the near one. Four measured correspondences determine it exactly. Measuring beats assuming —
 # the camera can be anywhere, and a wrong constant silently puts every click somewhere else.
-_H = None            # plane -> pixel, row-major 3x3
-_SAFE = None         # (xmin, xmax, ymin, ymax) of the plane region the probes covered
+_H = None  # plane -> pixel, row-major 3x3
+_SAFE = None  # (xmin, xmax, ymin, ymax) of the plane region the probes covered
 
 
 def _solve(A, b):
@@ -166,8 +175,10 @@ def fit_homography(pairs):
     """pairs: [((X_mm, Y_mm), (u_px, v_px)), ...] -> 3x3 plane->pixel with h22 = 1."""
     A, b = [], []
     for (X, Y), (u, v) in pairs:
-        A.append([X, Y, 1, 0, 0, 0, -u * X, -u * Y]); b.append(u)
-        A.append([0, 0, 0, X, Y, 1, -v * X, -v * Y]); b.append(v)
+        A.append([X, Y, 1, 0, 0, 0, -u * X, -u * Y])
+        b.append(u)
+        A.append([0, 0, 0, X, Y, 1, -v * X, -v * Y])
+        b.append(v)
     h = _solve(A, b)
     return [h[0], h[1], h[2], h[3], h[4], h[5], h[6], h[7], 1.0]
 
@@ -206,6 +217,7 @@ def movemm(X, Y, pause=0.2):
 
 
 # ---------------------------------------------------------------- session control
+
 
 def leave_sketch():
     """Back to a clean Feature-mode document, whatever state the last rung left behind."""
@@ -289,13 +301,13 @@ def enter_sketch(tool_key, plane_px=(913, 359)):
     """
     leave_sketch()
     key("shift+s", 0.8)
-    click(*plane_px, pause=0.8)   # picks the plane: the session opens and the offer pops...
-    click(*plane_px)              # ...and this closes the offer
+    click(*plane_px, pause=0.8)  # picks the plane: the session opens and the offer pops...
+    click(*plane_px)  # ...and this closes the offer
     key("p", 0.6)
     if try_call("sketch_describe") is None:
         shot("/shots/gl-enter-failed.png")
         die("no sketch opened after Shift+S + plane click (see /shots/gl-enter-failed.png)")
-    calibrate_here()            # THIS sketch's own camera map, on THIS sketch's own plane
+    calibrate_here()  # THIS sketch's own camera map, on THIS sketch's own plane
     key(tool_key, 0.6)
 
 
@@ -323,10 +335,11 @@ def calibrate_here():
         if abs(u - probes[i][0]) > 0.5 or abs(v - probes[i][1]) > 0.5:
             die(f"calibration residual too large at probe {i}: {(u, v)} vs {probes[i]}")
     global _SAFE
-    xs = [e["p"][0] for e in ents]; ys = [e["p"][1] for e in ents]
+    xs = [e["p"][0] for e in ents]
+    ys = [e["p"][1] for e in ents]
     _SAFE = (min(xs), max(xs), min(ys), max(ys))
     for _ in range(len(probes)):
-        key("ctrl+z", 0.5)                 # the probes are scaffolding, not geometry
+        key("ctrl+z", 0.5)  # the probes are scaffolding, not geometry
     left = describe()["entities"]
     if left:
         die(f"{len(left)} calibration probes survived the undo")
@@ -393,6 +406,7 @@ def values(*vs):
 
 # ---------------------------------------------------------------- grading
 
+
 def say(msg):
     print(f"  {msg}")
 
@@ -428,10 +442,12 @@ def loops():
 # Every 2D tool draws its primitive by gesture, then takes its exact value from the keyboard.
 # The click only has to be roughly right; the typed number is what must come back exactly.
 
+
 def rung_rect():
     print("\nA1  rectangle — two corners, typed 120 x 80")
     enter_sketch("r")
-    clickmm(-60, -40); clickmm(60, 40)
+    clickmm(-60, -40)
+    clickmm(60, 40)
     values(120, 80)
     d = describe()
     ls = lengths(d["entities"])
@@ -439,33 +455,43 @@ def rung_rect():
     lp = d["closed_loops"]
     check("CLOSED", len(lp) == 1 and lp[0]["closed"], f"{len(lp)} closed loop(s)")
     check("AREA", near(abs(lp[0]["area"]), 9600.0, 1e-6), f"area {abs(lp[0]['area']):.6f}")
-    check("VERTEX", all(near(abs(e["p1"][0] - e["p0"][0]), 0, 1e-9)
-                        or near(abs(e["p1"][1] - e["p0"][1]), 0, 1e-9)
-                        for e in d["entities"]), "every side axis-aligned")
+    check(
+        "VERTEX",
+        all(near(abs(e["p1"][0] - e["p0"][0]), 0, 1e-9) or near(abs(e["p1"][1] - e["p0"][1]), 0, 1e-9) for e in d["entities"]),
+        "every side axis-aligned",
+    )
     leave_sketch()
 
 
 def rung_circle():
     print("\nA2  circle — centre then rim, typed radius 25")
     enter_sketch("c")
-    clickmm(0, 0); clickmm(30, 0)
+    clickmm(0, 0)
+    clickmm(30, 0)
     values(25)
     d = describe()
     e = [x for x in d["entities"] if x["type"] == "circle"]
     check("ARC", len(e) == 1 and near(e[0]["radius"], 25.0), f"radius {e[0]['radius'] if e else None}")
-    check("VERTEX", len(e) == 1 and near(e[0]["center"][0], 0.0, 0.6) and near(e[0]["center"][1], 0.0, 0.6),
-          f"centre {e[0]['center'] if e else None} at the clicked origin")
+    check(
+        "VERTEX",
+        len(e) == 1 and near(e[0]["center"][0], 0.0, 0.6) and near(e[0]["center"][1], 0.0, 0.6),
+        f"centre {e[0]['center'] if e else None} at the clicked origin",
+    )
     lp = d["closed_loops"]
     check("CLOSED", len(lp) == 1 and lp[0]["closed"], f"{len(lp)} closed loop(s)")
-    check("AREA", len(lp) == 1 and near(abs(lp[0]["area"]), math.pi * 625.0, 1e-6),
-          f"area {abs(lp[0]['area']):.6f} vs pi r^2 {math.pi*625:.6f}")
+    check(
+        "AREA",
+        len(lp) == 1 and near(abs(lp[0]["area"]), math.pi * 625.0, 1e-6),
+        f"area {abs(lp[0]['area']):.6f} vs pi r^2 {math.pi * 625:.6f}",
+    )
     leave_sketch()
 
 
 def rung_line():
     print("\nA3  line — two clicks, typed length 50 and angle 30")
     enter_sketch("l")
-    clickmm(-40, -20); clickmm(10, 5)
+    clickmm(-40, -20)
+    clickmm(10, 5)
     values(50, 30)
     d = describe()
     e = [x for x in d["entities"] if x["type"] == "line"]
@@ -479,7 +505,9 @@ def rung_line():
 def rung_arc():
     print("\nA4  three-point arc — typed radius 40 and sweep 90")
     enter_sketch("a")
-    clickmm(-40, 0); clickmm(40, 0); clickmm(0, 40)
+    clickmm(-40, 0)
+    clickmm(40, 0)
+    clickmm(0, 40)
     values(40, 90)
     d = describe()
     e = [x for x in d["entities"] if x["type"] == "arc"]
@@ -491,62 +519,74 @@ def rung_arc():
         # residual here is 7e-10 mm at r=40 — float round-trip, not a defect.
         check("ANGLE", near(sw, 90.0, 1e-7), f"sweep {sw:.9f} deg")
         ch = math.dist(e[0]["p0"], e[0]["p1"])
-        check("VERTEX", near(ch, 40.0 * math.sqrt(2.0), 1e-6),
-              f"chord {ch:.6f} vs r*sqrt2 {40*math.sqrt(2):.6f}")
+        check("VERTEX", near(ch, 40.0 * math.sqrt(2.0), 1e-6), f"chord {ch:.6f} vs r*sqrt2 {40 * math.sqrt(2):.6f}")
     leave_sketch()
 
 
 def rung_slot():
     print("\nA5  slot — typed centre distance 60, radius 10, angle 0")
     enter_sketch("s")
-    clickmm(-30, 0); clickmm(30, 0); clickmm(30, 12)
+    clickmm(-30, 0)
+    clickmm(30, 0)
+    clickmm(30, 12)
     values(60, 10, 0)
     d = describe()
     arcs = [x for x in d["entities"] if x["type"] == "arc"]
-    lns  = [x for x in d["entities"] if x["type"] == "line"]
-    check("ARC", len(arcs) == 2 and all(near(a["radius"], 10.0) for a in arcs),
-          f"two end radii {[round(a['radius'], 9) for a in arcs]}")
-    check("LENGTH", len(lns) == 2 and all(near(l["length"], 60.0) for l in lns),
-          f"two flanks {[round(l['length'], 9) for l in lns]}")
+    lns = [x for x in d["entities"] if x["type"] == "line"]
+    check(
+        "ARC",
+        len(arcs) == 2 and all(near(a["radius"], 10.0) for a in arcs),
+        f"two end radii {[round(a['radius'], 9) for a in arcs]}",
+    )
+    check(
+        "LENGTH", len(lns) == 2 and all(near(l["length"], 60.0) for l in lns), f"two flanks {[round(l['length'], 9) for l in lns]}"
+    )
     lp = d["closed_loops"]
     check("CLOSED", len(lp) == 1 and lp[0]["closed"], f"{len(lp)} closed loop(s)")
-    check("AREA", len(lp) == 1 and near(abs(lp[0]["area"]), 60 * 20 + math.pi * 100, 1e-6),
-          f"area {abs(lp[0]['area']):.6f} vs 60*20+pi*100 {60*20+math.pi*100:.6f}")
+    check(
+        "AREA",
+        len(lp) == 1 and near(abs(lp[0]["area"]), 60 * 20 + math.pi * 100, 1e-6),
+        f"area {abs(lp[0]['area']):.6f} vs 60*20+pi*100 {60 * 20 + math.pi * 100:.6f}",
+    )
     leave_sketch()
 
 
 def rung_polygon():
     print("\nA6  polygon — typed side 30, angle 0")
     enter_sketch("g")
-    clickmm(0, 0); clickmm(35, 0)
+    clickmm(0, 0)
+    clickmm(35, 0)
     values(30, 0)
     d = describe()
     e = [x for x in d["entities"] if x["type"] == "line"]
     ls = lengths(d["entities"])
-    check("LENGTH", len(e) >= 3 and all(near(l, 30.0, 1e-9) for l in ls),
-          f"{len(e)} equal sides {set(ls)}")
+    check("LENGTH", len(e) >= 3 and all(near(l, 30.0, 1e-9) for l in ls), f"{len(e)} equal sides {set(ls)}")
     lp = d["closed_loops"]
     check("CLOSED", len(lp) == 1 and lp[0]["closed"], f"{len(lp)} closed loop(s)")
     if e:
         n = len(e)
-        want = n * 30.0 ** 2 / (4.0 * math.tan(math.pi / n))
-        check("AREA", near(abs(lp[0]["area"]), want, 1e-6),
-              f"area {abs(lp[0]['area']):.6f} vs regular {n}-gon {want:.6f}")
+        want = n * 30.0**2 / (4.0 * math.tan(math.pi / n))
+        check("AREA", near(abs(lp[0]["area"]), want, 1e-6), f"area {abs(lp[0]['area']):.6f} vs regular {n}-gon {want:.6f}")
     leave_sketch()
 
 
 def rung_ellipse():
     print("\nA7  ellipse — typed major 50, minor 20")
     enter_sketch("e")
-    clickmm(0, 0); clickmm(40, 0); clickmm(0, 15)
+    clickmm(0, 0)
+    clickmm(40, 0)
+    clickmm(0, 15)
     values(50, 20)
     d = describe()
     e = [x for x in d["entities"] if x["type"] == "ellipse"]
     check("ARC", len(e) == 1, f"{len(e)} ellipse")
     lp = d["closed_loops"]
     check("CLOSED", len(lp) == 1 and lp[0]["closed"], f"{len(lp)} closed loop(s)")
-    check("AREA", len(lp) == 1 and near(abs(lp[0]["area"]), math.pi * 50 * 20, 2e-2),
-          f"area {abs(lp[0]['area']):.4f} vs pi*a*b {math.pi*1000:.4f}")
+    check(
+        "AREA",
+        len(lp) == 1 and near(abs(lp[0]["area"]), math.pi * 50 * 20, 2e-2),
+        f"area {abs(lp[0]['area']):.4f} vs pi*a*b {math.pi * 1000:.4f}",
+    )
     leave_sketch()
 
 
@@ -556,8 +596,11 @@ def rung_point():
     clickmm(20, 10)
     d = describe()
     e = [x for x in d["entities"] if x["type"] == "point"]
-    check("VERTEX", len(e) == 1 and near(e[0]["p"][0], 20.0, 0.6) and near(e[0]["p"][1], 10.0, 0.6),
-          f"placed at {[round(v, 3) for v in e[0]['p']] if e else None}")
+    check(
+        "VERTEX",
+        len(e) == 1 and near(e[0]["p"][0], 20.0, 0.6) and near(e[0]["p"][1], 10.0, 0.6),
+        f"placed at {[round(v, 3) for v in e[0]['p']] if e else None}",
+    )
     leave_sketch()
 
 
@@ -577,16 +620,20 @@ def rung_spline():
 # The strategic target itself: one closed outer loop with internal voids, every one of them
 # drawn by gesture in a single sketch and given its size from the keyboard.
 
+
 def rung_voids():
     print("\nB1  closed profile with two internal voids, all by gesture")
     enter_sketch("r")
-    clickmm(-60, -40); clickmm(60, 40)          # outer 120 x 80
+    clickmm(-60, -40)
+    clickmm(60, 40)  # outer 120 x 80
     values(120, 80)
-    key("r", 0.6)                                # same tool again, from the keyboard
-    clickmm(-45, -15); clickmm(-5, 15)           # void 1: 40 x 30
+    key("r", 0.6)  # same tool again, from the keyboard
+    clickmm(-45, -15)
+    clickmm(-5, 15)  # void 1: 40 x 30
     values(40, 30)
     key("c", 0.6)
-    clickmm(30, 0); clickmm(42, 0)               # void 2: circle r 10
+    clickmm(30, 0)
+    clickmm(42, 0)  # void 2: circle r 10
     values(10)
     d = describe()
     ls = lengths(d["entities"])
@@ -598,15 +645,16 @@ def rung_voids():
     # and neither inner loop may claim a hole of its own.
     outer = max(range(len(lp)), key=lambda i: abs(lp[i]["area"]))
     holes = sorted(lp[outer]["holes"])
-    check("VOID", holes == sorted(i for i in range(len(lp)) if i != outer),
-          f"outer loop {outer} owns holes {holes}")
-    check("VOID", all(not lp[i]["holes"] for i in range(len(lp)) if i != outer),
-          "neither void claims a hole of its own")
+    check("VOID", holes == sorted(i for i in range(len(lp)) if i != outer), f"outer loop {outer} owns holes {holes}")
+    check("VOID", all(not lp[i]["holes"] for i in range(len(lp)) if i != outer), "neither void claims a hole of its own")
     a = {i: abs(lp[i]["area"]) for i in range(len(lp))}
     check("AREA", near(a[outer], 9600.0, 1e-6), f"outer {a[outer]:.6f}")
     inner = sorted(a[i] for i in a if i != outer)
-    check("AREA", near(inner[0], math.pi * 100, 1e-6) and near(inner[1], 1200.0, 1e-6),
-          f"voids {inner[0]:.6f} (pi*100) and {inner[1]:.6f} (40*30)")
+    check(
+        "AREA",
+        near(inner[0], math.pi * 100, 1e-6) and near(inner[1], 1200.0, 1e-6),
+        f"voids {inner[0]:.6f} (pi*100) and {inner[1]:.6f} (40*30)",
+    )
     net = a[outer] - sum(v for i, v in a.items() if i != outer)
     check("AREA", near(net, 9600.0 - 1200.0 - math.pi * 100, 1e-6), f"net material {net:.6f}")
     leave_sketch()
@@ -618,6 +666,7 @@ def rung_voids():
 # the tool itself derives (render_op_gizmo: tip = anchor + dir * value, label = tip + dir * 1.2
 # * max(15 * unit_per_px, 1e-4)) rather than hunted for in the pixels — the tool's own formula
 # is the only thing that can be right by construction.
+
 
 def op_label_mm(anchor, direction, value, at):
     th = max(15.0 * mm_per_px(*at), 1e-4)
@@ -632,19 +681,21 @@ def mid(e):
 
 def corner_of(a, b):
     """The shared endpoint of two adjacent lines, and the bisector pointing into their wedge."""
-    C = min(((pa, pb) for pa in (a["p0"], a["p1"]) for pb in (b["p0"], b["p1"])),
-            key=lambda t: math.dist(t[0], t[1]))[0]
+    C = min(((pa, pb) for pa in (a["p0"], a["p1"]) for pb in (b["p0"], b["p1"])), key=lambda t: math.dist(t[0], t[1]))[0]
+
     def away(e):
         f = e["p1"] if math.dist(e["p0"], C) < math.dist(e["p1"], C) else e["p0"]
         n = math.dist(f, C)
         return ((f[0] - C[0]) / n, (f[1] - C[1]) / n)
+
     ua, ub = away(a), away(b)
     bis = (ua[0] + ub[0], ua[1] + ub[1])
     return tuple(C), bis
 
 
 def draw_rect(w, h, x0, y0):
-    clickmm(x0, y0); clickmm(x0 + w, y0 + h)
+    clickmm(x0, y0)
+    clickmm(x0 + w, y0 + h)
     values(w, h)
 
 
@@ -655,7 +706,8 @@ def rung_fillet():
     d0 = describe()["entities"]
     a, b = corner_pair(d0)
     key("f", 0.6)
-    clickmm(*mid(a)); clickmm(*mid(b))
+    clickmm(*mid(a))
+    clickmm(*mid(b))
     C, bis = corner_of(a, b)
     v0 = 0.2 * min(a["length"], b["length"])
     clickmm(*op_label_mm(C, bis, v0, C))
@@ -666,8 +718,11 @@ def rung_fillet():
     lp = d["closed_loops"]
     check("CLOSED", len(lp) == 1 and lp[0]["closed"], f"{len(lp)} closed loop(s)")
     want = 9600.0 - 64.0 * (1.0 - math.pi / 4.0)
-    check("AREA", len(lp) == 1 and near(abs(lp[0]["area"]), want, 1e-6),
-          f"area {abs(lp[0]['area']):.6f} vs 9600 - r^2(1-pi/4) {want:.6f}")
+    check(
+        "AREA",
+        len(lp) == 1 and near(abs(lp[0]["area"]), want, 1e-6),
+        f"area {abs(lp[0]['area']):.6f} vs 9600 - r^2(1-pi/4) {want:.6f}",
+    )
     if arcs:
         # TANGENT: the arc centre must sit exactly r from each surviving leg's line.
         legs = [x for x in d["entities"] if x["type"] == "line"]
@@ -683,32 +738,34 @@ def rung_chamfer():
     d0 = describe()["entities"]
     a, b = corner_pair(d0)
     key("h", 0.6)
-    clickmm(*mid(a)); clickmm(*mid(b))
+    clickmm(*mid(a))
+    clickmm(*mid(b))
     C, bis = corner_of(a, b)
     clickmm(*op_label_mm(C, bis, 0.2 * min(a["length"], b["length"]), C))
     values(10)
     d = describe()
     lp = d["closed_loops"]
     check("CLOSED", len(lp) == 1 and lp[0]["closed"], f"{len(lp)} closed loop(s)")
-    check("LENGTH", len(lp) == 1 and len(lp[0]["entities"]) == 5,
-          f"{len(lp[0]['entities'])} sides after the cut")
+    check("LENGTH", len(lp) == 1 and len(lp[0]["entities"]) == 5, f"{len(lp[0]['entities'])} sides after the cut")
     ls = sorted(e["length"] for e in d["entities"] if e["type"] == "line")
-    check("LENGTH", any(near(x, 10.0 * math.sqrt(2.0), 1e-9) for x in ls),
-          f"the new face is d*sqrt2 = {10*math.sqrt(2):.9f}; sides {[round(x,9) for x in ls]}")
-    check("LENGTH", near(ls[1], 70.0, 1e-9) and near(ls[3], 110.0, 1e-9),
-          "both legs shortened by exactly d")
-    check("AREA", len(lp) == 1 and near(abs(lp[0]["area"]), 9600.0 - 50.0, 1e-6),
-          f"area {abs(lp[0]['area']):.6f} vs 9600 - d^2/2")
+    check(
+        "LENGTH",
+        any(near(x, 10.0 * math.sqrt(2.0), 1e-9) for x in ls),
+        f"the new face is d*sqrt2 = {10 * math.sqrt(2):.9f}; sides {[round(x, 9) for x in ls]}",
+    )
+    check("LENGTH", near(ls[1], 70.0, 1e-9) and near(ls[3], 110.0, 1e-9), "both legs shortened by exactly d")
+    check("AREA", len(lp) == 1 and near(abs(lp[0]["area"]), 9600.0 - 50.0, 1e-6), f"area {abs(lp[0]['area']):.6f} vs 9600 - d^2/2")
     leave_sketch()
 
 
 def rung_offset():
     print("\nC3  offset — pick a circle, type 5 on the label")
     enter_sketch("c")
-    clickmm(0, 0); clickmm(30, 0)
+    clickmm(0, 0)
+    clickmm(30, 0)
     values(25)
     key("o", 0.6)
-    clickmm(25, 0)                                  # pick the rim
+    clickmm(25, 0)  # pick the rim
     # Circle offset anchors at centre + (r, 0) and grows along +x; the starting value is 0.1 * 2r.
     clickmm(*op_label_mm((25.0, 0.0), (1.0, 0.0), 0.1 * 50.0, (25.0, 0.0)))
     values(5)
@@ -716,8 +773,11 @@ def rung_offset():
     cs = sorted(x["radius"] for x in d["entities"] if x["type"] == "circle")
     # The gizmo's arrow starts on the +x side, so the typed 5 lands OUTWARD; what the goal cares
     # about is that the separation is exactly the number typed, on whichever side it was given.
-    check("ARC", len(cs) == 2 and near(cs[0], 25.0) and near(cs[1] - cs[0], 5.0),
-          f"radii {cs} — separated by exactly {cs[1]-cs[0] if len(cs)==2 else None}")
+    check(
+        "ARC",
+        len(cs) == 2 and near(cs[0], 25.0) and near(cs[1] - cs[0], 5.0),
+        f"radii {cs} — separated by exactly {cs[1] - cs[0] if len(cs) == 2 else None}",
+    )
     lp = d["closed_loops"]
     check("CLOSED", len(lp) == 2 and all(l["closed"] for l in lp), f"{len(lp)} closed loops")
     check("VOID", any(l["holes"] for l in lp), "the inner circle is read as a void of the outer")
@@ -758,17 +818,18 @@ CONSTRUCTION_CHECKBOX = (419 + RIBBON_DX, 75 + CHROME_DY)
 
 
 def draw_line(x0, y0, x1, y1, length, angle):
-    clickmm(x0, y0); clickmm(x1, y1)
+    clickmm(x0, y0)
+    clickmm(x1, y1)
     values(length, angle)
 
 
 def rung_mirror():
     print("\nC4  mirror — a half profile reflected about a construction axis")
     enter_sketch("l")
-    click(*CONSTRUCTION_CHECKBOX)                    # the axis is reference, not material
+    click(*CONSTRUCTION_CHECKBOX)  # the axis is reference, not material
     key("l", 0.6)
-    draw_line(0, -40, 0, 40, 80, 90)                 # the axis, on x = 0
-    click(*CONSTRUCTION_CHECKBOX)                    # back to real geometry
+    draw_line(0, -40, 0, 40, 80, 90)  # the axis, on x = 0
+    click(*CONSTRUCTION_CHECKBOX)  # back to real geometry
     key("l", 0.6)
     draw_line(0, -40, 50, -40, 50, 0)
     key("l", 0.6)
@@ -784,7 +845,7 @@ def rung_mirror():
     clickmm(*mid(axis[0]))
     for e in half:
         clickmm(*mid(e))
-    clickmm(-90, 60)                                 # empty space confirms
+    clickmm(-90, 60)  # empty space confirms
     d = describe()
     real = [e for e in d["entities"] if e["type"] == "line" and not e.get("construction")]
     check("LENGTH", len(real) == 6, f"{len(real)} lines after the reflection")
@@ -794,14 +855,18 @@ def rung_mirror():
     # synthetic click lands on a whole pixel, so the half profile sits a few tenths of a
     # millimetre off the origin; the typed values fix its lengths and angles, not its anchor.
     # Demanding 8000.000000 here would grade my aim, and the mirror is what is under test.
-    far = max(half, key=lambda e: e["length"])            # the edge parallel to the axis
-    w   = point_line_dist(mid(far), axis[0])
+    far = max(half, key=lambda e: e["length"])  # the edge parallel to the axis
+    w = point_line_dist(mid(far), axis[0])
     want = 2.0 * w * far["length"]
-    check("AREA", len(lp) == 1 and near(abs(lp[0]["area"]), want, 1e-6),
-          f"area {abs(lp[0]['area']):.6f} vs 2 x {w:.6f} x {far['length']:.6f} = {want:.6f}")
+    check(
+        "AREA",
+        len(lp) == 1 and near(abs(lp[0]["area"]), want, 1e-6),
+        f"area {abs(lp[0]['area']):.6f} vs 2 x {w:.6f} x {far['length']:.6f} = {want:.6f}",
+    )
     # SYMMETRY is the property this rung exists for: every vertex must have its exact reflection
     # ABOUT THE AXIS THAT WAS DRAWN.
     vs = [tuple(p) for e in real for p in (e["p0"], e["p1"])]
+
     def refl(q):
         (ax, ay), (bx, by) = axis[0]["p0"], axis[0]["p1"]
         dx, dy = bx - ax, by - ay
@@ -809,9 +874,9 @@ def rung_mirror():
         t = ((q[0] - ax) * dx + (q[1] - ay) * dy) / n
         fx, fy = ax + t * dx, ay + t * dy
         return (2 * fx - q[0], 2 * fy - q[1])
+
     missing = [v for v in vs if not any(math.dist(refl(v), o) < 1e-9 for o in vs)]
-    check("SYMMETRY", not missing,
-          f"every one of {len(vs)} vertices has its exact reflection about the drawn axis")
+    check("SYMMETRY", not missing, f"every one of {len(vs)} vertices has its exact reflection about the drawn axis")
     leave_sketch()
 
 
@@ -823,17 +888,19 @@ def rung_trim():
     draw_line(0, -50, 0, 50, 100, 90)
     d0 = describe()["entities"]
     horiz = min(d0, key=lambda e: abs(e["p1"][1] - e["p0"][1]))
-    vert  = max(d0, key=lambda e: abs(e["p1"][1] - e["p0"][1]))
+    vert = max(d0, key=lambda e: abs(e["p1"][1] - e["p0"][1]))
     X = cross(horiz, vert)
-    left = min(horiz["p0"], horiz["p1"])              # the end that must survive
+    left = min(horiz["p0"], horiz["p1"])  # the end that must survive
     want = math.dist(left, X)
     key("t", 0.6)
-    clickmm(*mid_of(X, max(horiz["p0"], horiz["p1"])))   # the arm on the far side of the crossing
+    clickmm(*mid_of(X, max(horiz["p0"], horiz["p1"])))  # the arm on the far side of the crossing
     d = describe()
     ls = sorted(round(e["length"], 9) for e in d["entities"] if e["type"] == "line")
-    check("LENGTH", len(ls) == 2 and near(ls[1], vert["length"], 1e-9) and near(ls[0], want, 1e-9),
-          f"lengths {ls} — the picked arm is gone at the crossing (expected {want:.9f}), "
-          f"the other line untouched")
+    check(
+        "LENGTH",
+        len(ls) == 2 and near(ls[1], vert["length"], 1e-9) and near(ls[0], want, 1e-9),
+        f"lengths {ls} — the picked arm is gone at the crossing (expected {want:.9f}), the other line untouched",
+    )
     ends = [tuple(p) for e in d["entities"] if e["type"] == "line" for p in (e["p0"], e["p1"])]
     check("VERTEX", any(math.dist(X, q) < 1e-9 for q in ends), "the cut lands exactly on the crossing")
     leave_sketch()
@@ -847,20 +914,18 @@ def rung_extend():
     draw_line(0, -50, 0, 50, 100, 90)
     d0 = describe()["entities"]
     short = min(d0, key=lambda e: e["length"])
-    vert  = max(d0, key=lambda e: e["length"])
+    vert = max(d0, key=lambda e: e["length"])
     X = cross(short, vert)
-    far = min((short["p0"], short["p1"]), key=lambda q: q[0])   # the end that stays put
+    far = min((short["p0"], short["p1"]), key=lambda q: q[0])  # the end that stays put
     near_end = max((short["p0"], short["p1"]), key=lambda q: q[0])
     want = math.dist(far, X)
     key("x", 0.6)
-    clickmm(*mid_of(near_end, mid_of(far, near_end)))           # click the end that must grow
+    clickmm(*mid_of(near_end, mid_of(far, near_end)))  # click the end that must grow
     d = describe()
     ls = sorted(round(e["length"], 9) for e in d["entities"] if e["type"] == "line")
-    check("LENGTH", len(ls) == 2 and near(ls[0], want, 1e-9),
-          f"lengths {ls} — {short['length']:.6f} grew to exactly {want:.9f}")
+    check("LENGTH", len(ls) == 2 and near(ls[0], want, 1e-9), f"lengths {ls} — {short['length']:.6f} grew to exactly {want:.9f}")
     ends = [tuple(p) for e in d["entities"] if e["type"] == "line" for p in (e["p0"], e["p1"])]
-    check("VERTEX", any(math.dist(X, q) < 1e-9 for q in ends),
-          "the new end sits exactly on the target line")
+    check("VERTEX", any(math.dist(X, q) < 1e-9 for q in ends), "the new end sits exactly on the target line")
     leave_sketch()
 
 
@@ -883,10 +948,33 @@ def rung_extend():
 # because the ladder only ever clicks "perpendicular" (3) and "equal" (5), both of which sit
 # before the first insertion. The next rung to use "tangent" would have clicked "collinear".
 CON_BTN_Y = 76 + CHROME_DY
-CON_BTN = {n: (449 + RIBBON_DX + 42 * i, CON_BTN_Y) for i, n in enumerate(
-    ["horizontal", "vertical", "parallel", "perpendicular", "coincident", "equal",
-     "equal_radius", "collinear", "concentric", "tangent", "midpoint", "symmetric",
-     "sym_v", "sym_h", "angle", "radius", "diameter", "fix", "dist_x", "dist_y"])}
+CON_BTN = {
+    n: (449 + RIBBON_DX + 42 * i, CON_BTN_Y)
+    for i, n in enumerate(
+        [
+            "horizontal",
+            "vertical",
+            "parallel",
+            "perpendicular",
+            "coincident",
+            "equal",
+            "equal_radius",
+            "collinear",
+            "concentric",
+            "tangent",
+            "midpoint",
+            "symmetric",
+            "sym_v",
+            "sym_h",
+            "angle",
+            "radius",
+            "diameter",
+            "fix",
+            "dist_x",
+            "dist_y",
+        ]
+    )
+}
 
 # The SAME twenty buttons, at their SKETCH-mode x. Constraining during a sketch put the group
 # after the (wide) sketch toolbar instead of at the start of an otherwise empty row, so every
@@ -897,17 +985,41 @@ CON_BTN = {n: (449 + RIBBON_DX + 42 * i, CON_BTN_Y) for i, n in enumerate(
 # which already carries CHROME_DY), but the X start depends on how wide the sketch toolbar to the
 # left of this group renders, and this fork keeps mainline's top row. Re-measure before trusting
 # D11 here: screenshot in sketch mode and detect the icon columns, do not derive it by offset.
-CON_BTN_SKETCH = {n: (677 + RIBBON_DX + 42 * i, CON_BTN_Y) for i, n in enumerate(
-    ["horizontal", "vertical", "parallel", "perpendicular", "coincident", "equal",
-     "equal_radius", "collinear", "concentric", "tangent", "midpoint", "symmetric",
-     "sym_v", "sym_h", "angle", "radius", "diameter", "fix", "dist_x", "dist_y"])}
+CON_BTN_SKETCH = {
+    n: (677 + RIBBON_DX + 42 * i, CON_BTN_Y)
+    for i, n in enumerate(
+        [
+            "horizontal",
+            "vertical",
+            "parallel",
+            "perpendicular",
+            "coincident",
+            "equal",
+            "equal_radius",
+            "collinear",
+            "concentric",
+            "tangent",
+            "midpoint",
+            "symmetric",
+            "sym_v",
+            "sym_h",
+            "angle",
+            "radius",
+            "diameter",
+            "fix",
+            "dist_x",
+            "dist_y",
+        ]
+    )
+}
 
 
 def draw_rect_undimensioned():
     """A rectangle by two clicks, with both queued value fields dismissed (Esc keeps it as drawn)."""
-    clickmm(-60, -40); clickmm(60, 40)
-    key("Escape", 0.7)      # Width  — keep as drawn
-    key("Escape", 0.7)      # Height — keep as drawn
+    clickmm(-60, -40)
+    clickmm(60, 40)
+    key("Escape", 0.7)  # Width  — keep as drawn
+    key("Escape", 0.7)  # Height — keep as drawn
 
 
 def rung_dimension():
@@ -945,8 +1057,7 @@ def confirm_and_reopen():
     """
     click(*CONFIRM_BTN, pause=1.5)
     w, X, Y, _, _ = win()
-    sh(f"DISPLAY={DISP} xdotool mousemove {X+TREE_ROW0[0]} {Y+TREE_ROW0[1]} "
-       f"click --repeat 2 --delay 120 1")
+    sh(f"DISPLAY={DISP} xdotool mousemove {X + TREE_ROW0[0]} {Y + TREE_ROW0[1]} click --repeat 2 --delay 120 1")
     time.sleep(2.0)
     return describe()
 
@@ -957,16 +1068,18 @@ def rung_constrain():
     enter_sketch("r")
     draw_rect_undimensioned()
     a, b = corner_pair(describe()["entities"])
-    check("LENGTH", not near(a["length"], b["length"], 1e-6),
-          f"the two sides start unequal: {a['length']:.6f} vs {b['length']:.6f}")
-    key("k", 1.5)                              # finish the sketch and enter Constrain
+    check(
+        "LENGTH", not near(a["length"], b["length"], 1e-6), f"the two sides start unequal: {a['length']:.6f} vs {b['length']:.6f}"
+    )
+    key("k", 1.5)  # finish the sketch and enter Constrain
     # Re-read the picks from the COMMITTED sketch: finish_sketch repackages the entities, so an
     # index taken before Constrain is not the same index afterwards.
     d1 = describe()
     a, b = corner_pair(d1["entities"])
-    dof0 = 4                                   # an undimensioned rectangle: position + size
+    dof0 = 4  # an undimensioned rectangle: position + size
     ia, ib = d1["entities"].index(a), d1["entities"].index(b)
-    clickmm(*mid(a)); clickmm(*mid(b))
+    clickmm(*mid(a))
+    clickmm(*mid(b))
     click(*CON_BTN["equal"])
     time.sleep(1.0)
     d = describe()
@@ -974,11 +1087,9 @@ def rung_constrain():
     check("LENGTH", near(la, lb, 1e-9), f"the two sides are now equal: {la:.9f} and {lb:.9f}")
     d2 = confirm_and_reopen()
     check("VERTEX", d2["dof"] == dof0 - 1, f"degrees of freedom {dof0} -> {d2['dof']} after the round trip")
-    check("CLOSED", d2["solve_ok"] and d2["constraints"] > 0,
-          f"{d2['constraints']} constraints survived the commit")
+    check("CLOSED", d2["solve_ok"] and d2["constraints"] > 0, f"{d2['constraints']} constraints survived the commit")
     ls2 = sorted(round(e["length"], 9) for e in d2["entities"] if e["type"] == "line")
-    check("LENGTH", near(ls2[0], la, 1e-9) and near(ls2[-1], la, 1e-9),
-          f"the geometry came back unchanged: {ls2}")
+    check("LENGTH", near(ls2[0], la, 1e-9) and near(ls2[-1], la, 1e-9), f"the geometry came back unchanged: {ls2}")
     leave_sketch()
 
 
@@ -986,8 +1097,10 @@ def rung_perpendicular():
     reset_document()
     print("\nD3  constrain — two free lines made exactly perpendicular")
     enter_sketch("l")
-    clickmm(-50, -30); clickmm(30, -18)
-    key("Escape", 0.7); key("Escape", 0.7)
+    clickmm(-50, -30)
+    clickmm(30, -18)
+    key("Escape", 0.7)
+    key("Escape", 0.7)
     key("l", 0.6)
     # 56 degrees off the first line, not 3. The original second point put the pair within
     # inference's perpendicular tolerance, so on a rig whose camera maps the click a pixel
@@ -995,14 +1108,20 @@ def rung_perpendicular():
     # rung exists to test, and the precondition failed while every later check passed. Held on
     # one fork and failed on the other from the same source, which is the signature of a rung
     # that depends on luck. Start well outside any snap tolerance so the button has real work.
-    clickmm(30, -18); clickmm(55, 35)
-    key("Escape", 0.7); key("Escape", 0.7)
+    clickmm(30, -18)
+    clickmm(55, 35)
+    key("Escape", 0.7)
+    key("Escape", 0.7)
     d0 = describe()
-    check("ANGLE", abs(angle_between(d0["entities"][0], d0["entities"][1]) - 90.0) > 1e-3,
-          f"they start at {angle_between(d0['entities'][0], d0['entities'][1]):.6f} deg")
+    check(
+        "ANGLE",
+        abs(angle_between(d0["entities"][0], d0["entities"][1]) - 90.0) > 1e-3,
+        f"they start at {angle_between(d0['entities'][0], d0['entities'][1]):.6f} deg",
+    )
     key("k", 1.5)
     d1 = describe()
-    clickmm(*mid(d1["entities"][0])); clickmm(*mid(d1["entities"][1]))
+    clickmm(*mid(d1["entities"][0]))
+    clickmm(*mid(d1["entities"][1]))
     click(*CON_BTN["perpendicular"])
     time.sleep(1.0)
     d = describe()
@@ -1016,8 +1135,7 @@ def rung_perpendicular():
     d2 = confirm_and_reopen()
     ang2 = angle_between(d2["entities"][0], d2["entities"][1])
     check("ANGLE", near(ang2, 90.0, 1e-9), f"still {ang2:.9f} deg after the round trip")
-    check("CLOSED", d2["constraints"] > 0 and d2["solve_ok"],
-          f"{d2['constraints']} constraints survived, dof {d2['dof']}")
+    check("CLOSED", d2["constraints"] > 0 and d2["solve_ok"], f"{d2['constraints']} constraints survived, dof {d2['dof']}")
     leave_sketch()
 
 
@@ -1038,29 +1156,38 @@ def rung_parallel():
     reset_document()
     print("\nD10 constrain — two divergent lines made parallel (the button had no rung at all)")
     enter_sketch("l")
-    clickmm(-50, -30); clickmm(30, -18)
-    key("Escape", 0.7); key("Escape", 0.7)
+    clickmm(-50, -30)
+    clickmm(30, -18)
+    key("Escape", 0.7)
+    key("Escape", 0.7)
     key("l", 0.6)
     # Well outside inference's 3 deg snap, for the same reason D3 starts at 56: a pair that
     # arrives already parallel would let a dead button pass the rung.
-    clickmm(30, -18); clickmm(55, 35)
-    key("Escape", 0.7); key("Escape", 0.7)
+    clickmm(30, -18)
+    clickmm(55, 35)
+    key("Escape", 0.7)
+    key("Escape", 0.7)
     d0 = describe()
     g0 = parallel_gap(d0["entities"][0], d0["entities"][1])
     check("ANGLE", g0 > 1e-3, f"they start {g0:.6f} deg from parallel")
     key("k", 1.5)
     d1 = describe()
-    clickmm(*mid(d1["entities"][0])); clickmm(*mid(d1["entities"][1]))
+    clickmm(*mid(d1["entities"][0]))
+    clickmm(*mid(d1["entities"][1]))
     click(*CON_BTN["parallel"])
     time.sleep(1.0)
     d = describe()
     g = parallel_gap(d["entities"][0], d["entities"][1])
     check("ANGLE", near(g, 0.0, 1e-6), f"now {g:.9f} deg from parallel")
-    check("LENGTH", d["entities"][0]["length"] > 1.0 and d["entities"][1]["length"] > 1.0,
-          f"neither line collapsed: {d['entities'][0]['length']:.6f}, {d['entities'][1]['length']:.6f}")
+    check(
+        "LENGTH",
+        d["entities"][0]["length"] > 1.0 and d["entities"][1]["length"] > 1.0,
+        f"neither line collapsed: {d['entities'][0]['length']:.6f}, {d['entities'][1]['length']:.6f}",
+    )
     d2 = confirm_and_reopen()
-    check("CLOSED", d2["constraints"] > 0 and d2["solve_ok"],
-          f"{d2['constraints']} constraints survived the commit, dof {d2['dof']}")
+    check(
+        "CLOSED", d2["constraints"] > 0 and d2["solve_ok"], f"{d2['constraints']} constraints survived the commit, dof {d2['dof']}"
+    )
     leave_sketch()
 
 
@@ -1068,13 +1195,17 @@ def rung_live_constrain():
     reset_document()
     print("\nD11 constrain WHILE SKETCHING — no commit, no tree pick, no padlock")
     enter_sketch("l")
-    clickmm(-50, -30); clickmm(30, -18)
-    key("Escape", 0.7); key("Escape", 0.7)
+    clickmm(-50, -30)
+    clickmm(30, -18)
+    key("Escape", 0.7)
+    key("Escape", 0.7)
     key("l", 0.6)
-    clickmm(30, -18); clickmm(55, 35)
+    clickmm(30, -18)
+    clickmm(55, 35)
     # Two Escapes only: the first clears the polyline's pending point, the second drops the
     # tool to Select. The session stays LIVE -- that is the whole point of this rung.
-    key("Escape", 0.7); key("Escape", 0.7)
+    key("Escape", 0.7)
+    key("Escape", 0.7)
     d0 = describe()
     check("VERTEX", len(d0["entities"]) == 2, f"{len(d0['entities'])} entities in the live sketch")
     g0 = parallel_gap(d0["entities"][0], d0["entities"][1])
@@ -1089,11 +1220,15 @@ def rung_live_constrain():
     d = describe()
     g = parallel_gap(d["entities"][0], d["entities"][1])
     check("ANGLE", near(g, 0.0, 1e-6), f"parallel without ever leaving the sketch: {g:.9f} deg")
-    check("LENGTH", d["entities"][0]["length"] > 1.0 and d["entities"][1]["length"] > 1.0,
-          f"neither line collapsed: {d['entities'][0]['length']:.6f}, {d['entities'][1]['length']:.6f}")
+    check(
+        "LENGTH",
+        d["entities"][0]["length"] > 1.0 and d["entities"][1]["length"] > 1.0,
+        f"neither line collapsed: {d['entities'][0]['length']:.6f}, {d['entities'][1]['length']:.6f}",
+    )
     d2 = confirm_and_reopen()
-    check("CLOSED", d2["constraints"] > 0 and d2["solve_ok"],
-          f"{d2['constraints']} constraints survived the commit, dof {d2['dof']}")
+    check(
+        "CLOSED", d2["constraints"] > 0 and d2["solve_ok"], f"{d2['constraints']} constraints survived the commit, dof {d2['dof']}"
+    )
     leave_sketch()
 
 
@@ -1105,12 +1240,15 @@ def rung_live_constrain():
 # name list and it has drifted once already, unnoticed for months, because nothing pressed
 # anything past index 5. These rungs press the rest.
 
+
 def rung_vertical():
     reset_document()
     print("\nD12 constrain — Vertical on one line, from a line that is not")
     enter_sketch("l")
-    clickmm(-20, -35); clickmm(5, 30)
-    key("Escape", 0.7); key("Escape", 0.7)
+    clickmm(-20, -35)
+    clickmm(5, 30)
+    key("Escape", 0.7)
+    key("Escape", 0.7)
     d0 = describe()
     dx0 = abs(d0["entities"][0]["p1"][0] - d0["entities"][0]["p0"][0])
     check("VERTEX", dx0 > 1.0, f"it starts off-plumb by {dx0:.6f} mm")
@@ -1125,8 +1263,7 @@ def rung_vertical():
     check("VERTEX", near(dx, 0.0, 1e-6), f"now plumb: dx = {dx:.9f}")
     check("LENGTH", e["length"] > 1.0, f"and it did not collapse: {e['length']:.6f}")
     d2 = confirm_and_reopen()
-    check("CLOSED", d2["solve_ok"] and d2["constraints"] > 0,
-          f"{d2['constraints']} constraints survived the commit")
+    check("CLOSED", d2["solve_ok"] and d2["constraints"] > 0, f"{d2['constraints']} constraints survived the commit")
     leave_sketch()
 
 
@@ -1136,18 +1273,26 @@ def rung_equal_radius_button():
     # D4 proves the SHARED Equal button promotes on two circles. This presses design_c_equal_radius,
     # the first button after the six that were once inserted without updating this table.
     enter_sketch("c")
-    clickmm(-35, 0); clickmm(-20, 0); key("Escape", 0.7)
+    clickmm(-35, 0)
+    clickmm(-20, 0)
+    key("Escape", 0.7)
     key("c", 0.6)
-    clickmm(35, 0); clickmm(60, 0); key("Escape", 0.7)
+    clickmm(35, 0)
+    clickmm(60, 0)
+    key("Escape", 0.7)
     d0 = describe()
     cs = [e for e in d0["entities"] if e["type"] == "circle"]
-    check("ARC", len(cs) == 2 and not near(cs[0]["radius"], cs[1]["radius"], 1e-6),
-          f"they start unequal: {[round(c['radius'], 6) for c in cs]}")
+    check(
+        "ARC",
+        len(cs) == 2 and not near(cs[0]["radius"], cs[1]["radius"], 1e-6),
+        f"they start unequal: {[round(c['radius'], 6) for c in cs]}",
+    )
     key("k", 1.5)
     d1 = describe()
     cs = [e for e in d1["entities"] if e["type"] == "circle"]
     ia, ib = d1["entities"].index(cs[0]), d1["entities"].index(cs[1])
-    clickmm(*rim(cs[0])); clickmm(*rim(cs[1]))
+    clickmm(*rim(cs[0]))
+    clickmm(*rim(cs[1]))
     click(*CON_BTN["equal_radius"])
     time.sleep(1.0)
     d = describe()
@@ -1161,9 +1306,13 @@ def rung_concentric():
     reset_document()
     print("\nD14 constrain — Concentric puts two circles on one centre, radii untouched")
     enter_sketch("c")
-    clickmm(-30, -10); clickmm(-14, -10); key("Escape", 0.7)
+    clickmm(-30, -10)
+    clickmm(-14, -10)
+    key("Escape", 0.7)
     key("c", 0.6)
-    clickmm(28, 14); clickmm(52, 14); key("Escape", 0.7)
+    clickmm(28, 14)
+    clickmm(52, 14)
+    key("Escape", 0.7)
     d0 = describe()
     cs = [e for e in d0["entities"] if e["type"] == "circle"]
     gap0 = math.dist(cs[0]["center"], cs[1]["center"])
@@ -1173,7 +1322,8 @@ def rung_concentric():
     d1 = describe()
     cs = [e for e in d1["entities"] if e["type"] == "circle"]
     ia, ib = d1["entities"].index(cs[0]), d1["entities"].index(cs[1])
-    clickmm(*rim(cs[0])); clickmm(*rim(cs[1]))
+    clickmm(*rim(cs[0]))
+    clickmm(*rim(cs[1]))
     click(*CON_BTN["concentric"])
     time.sleep(1.0)
     d = describe()
@@ -1181,11 +1331,9 @@ def rung_concentric():
     check("ARC", near(gap, 0.0, 1e-6), f"centres now coincide: {gap:.9f} mm apart")
     # Concentric is about centres only. A solve that also equalised the radii would be wrong.
     r_after = sorted(round(d["entities"][i]["radius"], 9) for i in (ia, ib))
-    check("ARC", all(near(a, b, 1e-6) for a, b in zip(r_before, r_after)),
-          f"radii untouched: {r_before} -> {r_after}")
+    check("ARC", all(near(a, b, 1e-6) for a, b in zip(r_before, r_after)), f"radii untouched: {r_before} -> {r_after}")
     d2 = confirm_and_reopen()
-    check("CLOSED", d2["solve_ok"] and d2["constraints"] > 0,
-          f"{d2['constraints']} constraints survived the commit")
+    check("CLOSED", d2["solve_ok"] and d2["constraints"] > 0, f"{d2['constraints']} constraints survived the commit")
     leave_sketch()
 
 
@@ -1193,35 +1341,37 @@ def rung_tangent():
     reset_document()
     print("\nD15 constrain — Tangent brings a line to touch a circle exactly once")
     enter_sketch("c")
-    clickmm(0, 0); clickmm(20, 0); key("Escape", 0.7)
+    clickmm(0, 0)
+    clickmm(20, 0)
+    key("Escape", 0.7)
     key("l", 0.6)
     # A line that clearly MISSES the circle: its perpendicular distance from the centre is well
     # above the radius, so tangency has real work to do in the direction of shrinking the gap.
-    clickmm(-45, 38); clickmm(45, 44)
-    key("Escape", 0.7); key("Escape", 0.7)
+    clickmm(-45, 38)
+    clickmm(45, 44)
+    key("Escape", 0.7)
+    key("Escape", 0.7)
     d0 = describe()
     c0 = next(e for e in d0["entities"] if e["type"] == "circle")
     l0 = next(e for e in d0["entities"] if e["type"] == "line")
     d_before = point_line_distance(c0["center"], l0)
-    check("ARC", d_before > c0["radius"] + 1.0,
-          f"the line misses by {d_before - c0['radius']:.6f} mm")
+    check("ARC", d_before > c0["radius"] + 1.0, f"the line misses by {d_before - c0['radius']:.6f} mm")
     key("k", 1.5)
     d1 = describe()
     c1 = next(e for e in d1["entities"] if e["type"] == "circle")
     l1 = next(e for e in d1["entities"] if e["type"] == "line")
     ic, il = d1["entities"].index(c1), d1["entities"].index(l1)
-    clickmm(*rim(c1)); clickmm(*mid(l1))
+    clickmm(*rim(c1))
+    clickmm(*mid(l1))
     click(*CON_BTN["tangent"])
     time.sleep(1.2)
     d = describe()
     cc, ll = d["entities"][ic], d["entities"][il]
     dist = point_line_distance(cc["center"], ll)
-    check("ARC", near(dist, cc["radius"], 1e-6),
-          f"centre-to-line {dist:.9f} == radius {cc['radius']:.9f}")
+    check("ARC", near(dist, cc["radius"], 1e-6), f"centre-to-line {dist:.9f} == radius {cc['radius']:.9f}")
     check("ARC", cc["radius"] > 1e-6, f"and the circle did not collapse: r = {cc['radius']:.9f}")
     d2 = confirm_and_reopen()
-    check("CLOSED", d2["solve_ok"] and d2["constraints"] > 0,
-          f"{d2['constraints']} constraints survived the commit")
+    check("CLOSED", d2["solve_ok"] and d2["constraints"] > 0, f"{d2['constraints']} constraints survived the commit")
     leave_sketch()
 
 
@@ -1229,34 +1379,34 @@ def rung_midpoint():
     reset_document()
     print("\nD16 constrain — Midpoint drops a free point onto the middle of a line")
     enter_sketch("l")
-    clickmm(-50, -20); clickmm(40, 26)
-    key("Escape", 0.7); key("Escape", 0.7)
+    clickmm(-50, -20)
+    clickmm(40, 26)
+    key("Escape", 0.7)
+    key("Escape", 0.7)
     key("p", 0.6)
     clickmm(10, -35)
     d0 = describe()
     l0 = next(e for e in d0["entities"] if e["type"] == "line")
     p0 = next(e for e in d0["entities"] if e["type"] == "point")
     mid0 = ((l0["p0"][0] + l0["p1"][0]) / 2.0, (l0["p0"][1] + l0["p1"][1]) / 2.0)
-    check("VERTEX", math.dist(p0["p"], mid0) > 1.0,
-          f"the point starts {math.dist(p0['p'], mid0):.6f} mm off the midpoint")
+    check("VERTEX", math.dist(p0["p"], mid0) > 1.0, f"the point starts {math.dist(p0['p'], mid0):.6f} mm off the midpoint")
     key("k", 1.5)
     d1 = describe()
     l1 = next(e for e in d1["entities"] if e["type"] == "line")
     p1 = next(e for e in d1["entities"] if e["type"] == "point")
     il, ip = d1["entities"].index(l1), d1["entities"].index(p1)
     # Point first, then the line: Midpoint binds a POINT role on ea and a whole segment on eb.
-    clickmm(*p1["p"]); clickmm(*mid(l1))
+    clickmm(*p1["p"])
+    clickmm(*mid(l1))
     click(*CON_BTN["midpoint"])
     time.sleep(1.2)
     d = describe()
     ll, pp = d["entities"][il], d["entities"][ip]
     m = ((ll["p0"][0] + ll["p1"][0]) / 2.0, (ll["p0"][1] + ll["p1"][1]) / 2.0)
-    check("VERTEX", near(math.dist(pp["p"], m), 0.0, 1e-6),
-          f"the point sits on the midpoint: off by {math.dist(pp['p'], m):.9f}")
+    check("VERTEX", near(math.dist(pp["p"], m), 0.0, 1e-6), f"the point sits on the midpoint: off by {math.dist(pp['p'], m):.9f}")
     check("LENGTH", ll["length"] > 1.0, f"and the line did not collapse: {ll['length']:.6f}")
     d2 = confirm_and_reopen()
-    check("CLOSED", d2["solve_ok"] and d2["constraints"] > 0,
-          f"{d2['constraints']} constraints survived the commit")
+    check("CLOSED", d2["solve_ok"] and d2["constraints"] > 0, f"{d2['constraints']} constraints survived the commit")
     leave_sketch()
 
 
@@ -1266,23 +1416,30 @@ def rung_symmetric_line_axis():
     # D7 covers the implicit-axis buttons. This is the plain Symmetric: two entities AND an axis
     # entity, three picks, the only constraint on the bar that needs a third.
     enter_sketch("l")
-    clickmm(0, -40); clickmm(0, 40)          # the axis: a real line on x = 0
-    key("Escape", 0.7); key("Escape", 0.7)
+    clickmm(0, -40)
+    clickmm(0, 40)  # the axis: a real line on x = 0
+    key("Escape", 0.7)
+    key("Escape", 0.7)
     key("p", 0.6)
     clickmm(-38, 12)
     key("p", 0.6)
     clickmm(14, 12)
     d0 = describe()
     ps = [e for e in d0["entities"] if e["type"] == "point"]
-    check("VERTEX", not near(abs(ps[0]["p"][0]), abs(ps[1]["p"][0]), 1e-3),
-          f"they start unmirrored: x = {ps[0]['p'][0]:.6f}, {ps[1]['p'][0]:.6f}")
+    check(
+        "VERTEX",
+        not near(abs(ps[0]["p"][0]), abs(ps[1]["p"][0]), 1e-3),
+        f"they start unmirrored: x = {ps[0]['p'][0]:.6f}, {ps[1]['p'][0]:.6f}",
+    )
     key("k", 1.5)
     d1 = describe()
     ps = [e for e in d1["entities"] if e["type"] == "point"]
     ax = next(e for e in d1["entities"] if e["type"] == "line")
     ia, ib = d1["entities"].index(ps[0]), d1["entities"].index(ps[1])
     iax = d1["entities"].index(ax)
-    clickmm(*ps[0]["p"]); clickmm(*ps[1]["p"]); clickmm(*mid(ax))
+    clickmm(*ps[0]["p"])
+    clickmm(*ps[1]["p"])
+    clickmm(*mid(ax))
     click(*CON_BTN["symmetric"])
     time.sleep(1.2)
     d = describe()
@@ -1294,13 +1451,11 @@ def rung_symmetric_line_axis():
     sa = signed_point_line_distance(d["entities"][ia]["p"], ax_now)
     sb = signed_point_line_distance(d["entities"][ib]["p"], ax_now)
     ya, yb = d["entities"][ia]["p"][1], d["entities"][ib]["p"][1]
-    check("VERTEX", near(sa, -sb, 1e-6),
-          f"mirrored about the picked line: {sa:.9f} and {sb:.9f} from it")
+    check("VERTEX", near(sa, -sb, 1e-6), f"mirrored about the picked line: {sa:.9f} and {sb:.9f} from it")
     check("VERTEX", abs(sa) > 1e-6, f"and not both collapsed onto it: |d| = {abs(sa):.9f}")
     check("VERTEX", near(ya, yb, 1e-6), f"y untouched on both: {ya:.6f}, {yb:.6f}")
     d2 = confirm_and_reopen()
-    check("CLOSED", d2["solve_ok"] and d2["constraints"] > 0,
-          f"{d2['constraints']} constraints survived the commit")
+    check("CLOSED", d2["solve_ok"] and d2["constraints"] > 0, f"{d2['constraints']} constraints survived the commit")
     leave_sketch()
 
 
@@ -1313,13 +1468,17 @@ def rung_symmetric_h():
     clickmm(20, 9)
     d0 = describe()
     ps = [e for e in d0["entities"] if e["type"] == "point"]
-    check("VERTEX", not near(abs(ps[0]["p"][1]), abs(ps[1]["p"][1]), 1e-3),
-          f"they start unmirrored: y = {ps[0]['p'][1]:.6f}, {ps[1]['p'][1]:.6f}")
+    check(
+        "VERTEX",
+        not near(abs(ps[0]["p"][1]), abs(ps[1]["p"][1]), 1e-3),
+        f"they start unmirrored: y = {ps[0]['p'][1]:.6f}, {ps[1]['p'][1]:.6f}",
+    )
     key("k", 1.5)
     d1 = describe()
     ps = [e for e in d1["entities"] if e["type"] == "point"]
     ia, ib = d1["entities"].index(ps[0]), d1["entities"].index(ps[1])
-    clickmm(*ps[0]["p"]); clickmm(*ps[1]["p"])
+    clickmm(*ps[0]["p"])
+    clickmm(*ps[1]["p"])
     click(*CON_BTN["sym_h"])
     time.sleep(1.0)
     d = describe()
@@ -1329,8 +1488,7 @@ def rung_symmetric_h():
     check("VERTEX", abs(ya) > 1e-6, f"and not both collapsed onto the axis: |y| = {abs(ya):.9f}")
     check("VERTEX", near(xa, xb, 1e-6), f"x untouched on both: {xa:.6f}, {xb:.6f}")
     d2 = confirm_and_reopen()
-    check("CLOSED", d2["solve_ok"] and d2["constraints"] > 0,
-          f"{d2['constraints']} constraints survived the commit")
+    check("CLOSED", d2["solve_ok"] and d2["constraints"] > 0, f"{d2['constraints']} constraints survived the commit")
     leave_sketch()
 
 
@@ -1338,7 +1496,9 @@ def rung_radius():
     reset_document()
     print("\nD19 constrain — a typed Radius drives the circle to exactly that radius")
     enter_sketch("c")
-    clickmm(0, 0); clickmm(31, 0); key("Escape", 0.7)
+    clickmm(0, 0)
+    clickmm(31, 0)
+    key("Escape", 0.7)
     d0 = describe()
     c0 = next(e for e in d0["entities"] if e["type"] == "circle")
     check("ARC", not near(c0["radius"], 22.0, 1e-3), f"it starts at r = {c0['radius']:.6f}")
@@ -1355,11 +1515,11 @@ def rung_radius():
     cc = d["entities"][ic]
     check("ARC", near(cc["radius"], 22.0, 1e-6), f"radius driven to {cc['radius']:.9f}")
     # A Radius constraint moves the RIM, never the centre.
-    check("ARC", near(math.dist(cc["center"], ctr), 0.0, 1e-6),
-          f"and the centre stayed put: moved {math.dist(cc['center'], ctr):.9f}")
+    check(
+        "ARC", near(math.dist(cc["center"], ctr), 0.0, 1e-6), f"and the centre stayed put: moved {math.dist(cc['center'], ctr):.9f}"
+    )
     d2 = confirm_and_reopen()
-    check("CLOSED", d2["solve_ok"] and d2["constraints"] > 0,
-          f"{d2['constraints']} constraints survived the commit")
+    check("CLOSED", d2["solve_ok"] and d2["constraints"] > 0, f"{d2['constraints']} constraints survived the commit")
     leave_sketch()
 
 
@@ -1369,7 +1529,9 @@ def rung_diameter():
     # The failure this exists for is a factor of two: Diameter wired to the Radius handler gives
     # a circle of r = 30 for a typed 30, and nothing about the sketch looks wrong.
     enter_sketch("c")
-    clickmm(0, 0); clickmm(19, 0); key("Escape", 0.7)
+    clickmm(0, 0)
+    clickmm(19, 0)
+    key("Escape", 0.7)
     key("k", 1.5)
     d1 = describe()
     c1 = next(e for e in d1["entities"] if e["type"] == "circle")
@@ -1382,8 +1544,7 @@ def rung_diameter():
     r = d["entities"][ic]["radius"]
     check("ARC", near(r, 15.0, 1e-6), f"typed diameter 30 gives radius {r:.9f}, not 30")
     d2 = confirm_and_reopen()
-    check("CLOSED", d2["solve_ok"] and d2["constraints"] > 0,
-          f"{d2['constraints']} constraints survived the commit")
+    check("CLOSED", d2["solve_ok"] and d2["constraints"] > 0, f"{d2['constraints']} constraints survived the commit")
     leave_sketch()
 
 
@@ -1406,10 +1567,10 @@ def rung_fix():
     click(*CON_BTN["fix"])
     time.sleep(1.0)
     d = describe()
-    check("VERTEX", near(math.dist(d["entities"][ia]["p"], anchor), 0.0, 1e-9),
-          "the fixed point did not move when it was fixed")
+    check("VERTEX", near(math.dist(d["entities"][ia]["p"], anchor), 0.0, 1e-9), "the fixed point did not move when it was fixed")
     # Now demand a horizontal gap far from the current one. Only the FREE point may travel.
-    clickmm(*d["entities"][ia]["p"]); clickmm(*d["entities"][ib]["p"])
+    clickmm(*d["entities"][ia]["p"])
+    clickmm(*d["entities"][ib]["p"])
     click(*CON_BTN["dist_x"])
     time.sleep(0.8)
     values(70)
@@ -1417,11 +1578,9 @@ def rung_fix():
     moved_a = math.dist(d["entities"][ia]["p"], anchor)
     gap = abs(d["entities"][ib]["p"][0] - d["entities"][ia]["p"][0])
     check("LENGTH", near(gap, 70.0, 1e-6), f"the gap was driven to {gap:.9f}")
-    check("VERTEX", near(moved_a, 0.0, 1e-6),
-          f"and the anchored point held station: moved {moved_a:.9f}")
+    check("VERTEX", near(moved_a, 0.0, 1e-6), f"and the anchored point held station: moved {moved_a:.9f}")
     d2 = confirm_and_reopen()
-    check("CLOSED", d2["solve_ok"] and d2["constraints"] > 1,
-          f"{d2['constraints']} constraints survived the commit")
+    check("CLOSED", d2["solve_ok"] and d2["constraints"] > 1, f"{d2['constraints']} constraints survived the commit")
     leave_sketch()
 
 
@@ -1437,7 +1596,8 @@ def rung_distance_y():
     ps = [e for e in d1["entities"] if e["type"] == "point"]
     ia, ib = d1["entities"].index(ps[0]), d1["entities"].index(ps[1])
     dx_before = d1["entities"][ib]["p"][0] - d1["entities"][ia]["p"][0]
-    clickmm(*ps[0]["p"]); clickmm(*ps[1]["p"])
+    clickmm(*ps[0]["p"])
+    clickmm(*ps[1]["p"])
     click(*CON_BTN["dist_y"])
     time.sleep(0.8)
     values(35)
@@ -1445,17 +1605,18 @@ def rung_distance_y():
     gy = abs(d["entities"][ib]["p"][1] - d["entities"][ia]["p"][1])
     gx = d["entities"][ib]["p"][0] - d["entities"][ia]["p"][0]
     check("LENGTH", near(gy, 35.0, 1e-6), f"vertical gap driven to {gy:.9f}")
-    check("VERTEX", near(gx, dx_before, 1e-6),
-          f"the horizontal gap is untouched at {gx:.9f} — this is not a straight-line distance")
+    check(
+        "VERTEX", near(gx, dx_before, 1e-6), f"the horizontal gap is untouched at {gx:.9f} — this is not a straight-line distance"
+    )
     d2 = confirm_and_reopen()
-    check("CLOSED", d2["solve_ok"] and d2["constraints"] > 0,
-          f"{d2['constraints']} constraints survived the commit")
+    check("CLOSED", d2["solve_ok"] and d2["constraints"] > 0, f"{d2['constraints']} constraints survived the commit")
     leave_sketch()
 
 
 def signed_point_line_distance(p, line):
     """Perpendicular distance with a SIGN, so the two sides of a mirror are distinguishable."""
-    x0, y0 = line["p0"]; x1, y1 = line["p1"]
+    x0, y0 = line["p0"]
+    x1, y1 = line["p1"]
     dx, dy = x1 - x0, y1 - y0
     n = math.hypot(dx, dy)
     return (dy * (p[0] - x0) - dx * (p[1] - y0)) / n
@@ -1463,7 +1624,8 @@ def signed_point_line_distance(p, line):
 
 def point_line_distance(p, line):
     """Perpendicular distance from a point to the INFINITE line through a segment."""
-    x0, y0 = line["p0"]; x1, y1 = line["p1"]
+    x0, y0 = line["p0"]
+    x1, y1 = line["p1"]
     dx, dy = x1 - x0, y1 - y0
     n = math.hypot(dx, dy)
     return abs(dy * (p[0] - x0) - dx * (p[1] - y0)) / n
@@ -1471,6 +1633,7 @@ def point_line_distance(p, line):
 
 # =================================================================== DURABILITY
 # Exactness that does not survive an undo or a save is not exactness.
+
 
 def rim(e, deg=135.0):
     """A point on a circle's rim, away from +X.
@@ -1480,8 +1643,7 @@ def rim(e, deg=135.0):
     two-entity constraint silently discards the first.
     """
     a = math.radians(deg)
-    return (e["center"][0] + e["radius"] * math.cos(a),
-            e["center"][1] + e["radius"] * math.sin(a))
+    return (e["center"][0] + e["radius"] * math.cos(a), e["center"][1] + e["radius"] * math.sin(a))
 
 
 def rung_equal_radius():
@@ -1494,30 +1656,36 @@ def rung_equal_radius():
     # circles pinned to 15 and 25 is genuinely inconsistent -- the kernel refuses the addition
     # and is right to. Draw them at different sizes and leave the radius free.
     enter_sketch("c")
-    clickmm(-35, 0); clickmm(-20, 0); key("Escape", 0.7)
+    clickmm(-35, 0)
+    clickmm(-20, 0)
+    key("Escape", 0.7)
     key("c", 0.6)
-    clickmm(35, 0); clickmm(60, 0); key("Escape", 0.7)
+    clickmm(35, 0)
+    clickmm(60, 0)
+    key("Escape", 0.7)
     d0 = describe()
     cs = [e for e in d0["entities"] if e["type"] == "circle"]
-    check("ARC", len(cs) == 2 and not near(cs[0]["radius"], cs[1]["radius"], 1e-6),
-          f"they start unequal: {[round(c['radius'], 6) for c in cs]}")
+    check(
+        "ARC",
+        len(cs) == 2 and not near(cs[0]["radius"], cs[1]["radius"], 1e-6),
+        f"they start unequal: {[round(c['radius'], 6) for c in cs]}",
+    )
     key("k", 1.5)
     d1 = describe()
     cs = [e for e in d1["entities"] if e["type"] == "circle"]
     ia, ib = d1["entities"].index(cs[0]), d1["entities"].index(cs[1])
-    clickmm(*rim(cs[0])); clickmm(*rim(cs[1]))
-    click(*CON_BTN["equal"])          # the SHARED Equal button, not design_c_equal_radius
+    clickmm(*rim(cs[0]))
+    clickmm(*rim(cs[1]))
+    click(*CON_BTN["equal"])  # the SHARED Equal button, not design_c_equal_radius
     time.sleep(1.0)
     d = describe()
     ra, rb = d["entities"][ia]["radius"], d["entities"][ib]["radius"]
     check("ARC", near(ra, rb, 1e-9), f"the two radii are now equal: {ra:.9f} and {rb:.9f}")
     check("ARC", ra > 1e-6, f"and not equal at zero: {ra:.9f}")
     d2 = confirm_and_reopen()
-    check("CLOSED", d2["solve_ok"] and d2["constraints"] > 0,
-          f"{d2['constraints']} constraints survived the commit")
+    check("CLOSED", d2["solve_ok"] and d2["constraints"] > 0, f"{d2['constraints']} constraints survived the commit")
     rs = sorted(round(e["radius"], 9) for e in d2["entities"] if e["type"] == "circle")
-    check("ARC", len(rs) == 2 and near(rs[0], rs[-1], 1e-9),
-          f"still equal after the round trip: {rs}")
+    check("ARC", len(rs) == 2 and near(rs[0], rs[-1], 1e-9), f"still equal after the round trip: {rs}")
     leave_sketch()
 
 
@@ -1527,20 +1695,28 @@ def rung_collinear():
     # Oblique on purpose: axis-aligned segments pick up an auto Horizontal at draw time, and
     # this rung is about Collinear, not about interacting with inference.
     enter_sketch("l")
-    clickmm(-60, -14); clickmm(-12, -6)
-    key("Escape", 0.7); key("Escape", 0.7)
+    clickmm(-60, -14)
+    clickmm(-12, -6)
+    key("Escape", 0.7)
+    key("Escape", 0.7)
     key("l", 0.6)
-    clickmm(12, 14); clickmm(60, 22)
-    key("Escape", 0.7); key("Escape", 0.7)
+    clickmm(12, 14)
+    clickmm(60, 22)
+    key("Escape", 0.7)
+    key("Escape", 0.7)
     d0 = describe()
     ls = [e for e in d0["entities"] if e["type"] == "line"]
-    check("VERTEX", len(ls) == 2 and abs(ls[0]["p0"][1] - ls[1]["p0"][1]) > 1.0,
-          f"they start on different lines, dy = {abs(ls[0]['p0'][1] - ls[1]['p0'][1]):.6f}")
+    check(
+        "VERTEX",
+        len(ls) == 2 and abs(ls[0]["p0"][1] - ls[1]["p0"][1]) > 1.0,
+        f"they start on different lines, dy = {abs(ls[0]['p0'][1] - ls[1]['p0'][1]):.6f}",
+    )
     key("k", 1.5)
     d1 = describe()
     ls = [e for e in d1["entities"] if e["type"] == "line"]
     ia, ib = d1["entities"].index(ls[0]), d1["entities"].index(ls[1])
-    clickmm(*mid(ls[0])); clickmm(*mid(ls[1]))
+    clickmm(*mid(ls[0]))
+    clickmm(*mid(ls[1]))
     click(*CON_BTN["collinear"])
     time.sleep(1.0)
     d = describe()
@@ -1548,15 +1724,16 @@ def rung_collinear():
     ax, ay = A["p0"]
     dx, dy = A["p1"][0] - ax, A["p1"][1] - ay
     cross = [dx * (q[1] - ay) - dy * (q[0] - ax) for q in (B["p0"], B["p1"])]
-    check("VERTEX", all(abs(c) < 1e-6 for c in cross),
-          f"both ends of the second line lie on the first: cross {[round(c, 9) for c in cross]}")
+    check(
+        "VERTEX",
+        all(abs(c) < 1e-6 for c in cross),
+        f"both ends of the second line lie on the first: cross {[round(c, 9) for c in cross]}",
+    )
     # A line collapsed to a point is trivially collinear with anything, so the cross products
     # above pass on a degenerate solve. Both lines have to survive.
-    check("LENGTH", A["length"] > 1.0 and B["length"] > 1.0,
-          f"neither line collapsed: {A['length']:.6f}, {B['length']:.6f}")
+    check("LENGTH", A["length"] > 1.0 and B["length"] > 1.0, f"neither line collapsed: {A['length']:.6f}, {B['length']:.6f}")
     d2 = confirm_and_reopen()
-    check("CLOSED", d2["solve_ok"] and d2["constraints"] > 0,
-          f"{d2['constraints']} constraints survived the commit")
+    check("CLOSED", d2["solve_ok"] and d2["constraints"] > 0, f"{d2['constraints']} constraints survived the commit")
     leave_sketch()
 
 
@@ -1587,10 +1764,11 @@ def rung_distance_xy():
     # SIGNED — (pB - pA).dot(axis) — so if the refs were ordered to show |delta| while the real
     # delta is negative, accepting the number on screen teleports the point across its anchor.
     before = [list(d1["entities"][ia]["p"]), list(d1["entities"][ib]["p"])]
-    clickmm(*ps[0]["p"]); clickmm(*ps[1]["p"])
+    clickmm(*ps[0]["p"])
+    clickmm(*ps[1]["p"])
     click(*CON_BTN["dist_x"])
     time.sleep(0.8)
-    key("Return", 1.2)                 # accept the pre-filled value, type nothing
+    key("Return", 1.2)  # accept the pre-filled value, type nothing
     d = describe()
     after = [list(d["entities"][ia]["p"]), list(d["entities"][ib]["p"])]
     moved = max(abs(a - b) for pa, pb in zip(before, after) for a, b in zip(pa, pb))
@@ -1599,20 +1777,23 @@ def rung_distance_xy():
     # defect this guards is a sign flip, which moves the point by twice the gap — tens of
     # millimetres. A 1e-6 tolerance here failed on a 0.96 micron rounding step, which is the
     # instrument disagreeing with the display, not the app misbehaving.
-    check("VERTEX", moved < 5e-3,
-          f"accepting the shown value moved nothing (max {moved:.9f})")
+    check("VERTEX", moved < 5e-3, f"accepting the shown value moved nothing (max {moved:.9f})")
     # "nothing moved" passes just as happily when the constraint was never applied at all --
     # which is exactly how the phantom-endpoint bug hid. The gap has to be REAL and driveable,
     # so prove the mechanism works before trusting the no-op above.
-    check("LENGTH", abs(d["entities"][ib]["p"][0] - d["entities"][ia]["p"][0]) > 1.0,
-          "and the two points still have a real horizontal gap to dimension")
+    check(
+        "LENGTH",
+        abs(d["entities"][ib]["p"][0] - d["entities"][ia]["p"][0]) > 1.0,
+        "and the two points still have a real horizontal gap to dimension",
+    )
 
     # Now drive it with a TYPED value, on a FRESH pair. Not on the pair just dimensioned: that
     # one already carries its DistanceX, the button rightly refuses to dimension it twice, and no
     # field opens — so the digits went nowhere and the gap kept the value the no-op step had
     # accepted. A green "gap is 54.94" for a rung that typed 40 is the rung's fault, not the app's.
     dy_before = d["entities"][ic]["p"][1] - d["entities"][ia]["p"][1]
-    clickmm(*d["entities"][ia]["p"]); clickmm(*d["entities"][ic]["p"])
+    clickmm(*d["entities"][ia]["p"])
+    clickmm(*d["entities"][ic]["p"])
     click(*CON_BTN["dist_x"])
     time.sleep(0.8)
     values(40)
@@ -1620,11 +1801,9 @@ def rung_distance_xy():
     gx = abs(d["entities"][ic]["p"][0] - d["entities"][ia]["p"][0])
     gy = d["entities"][ic]["p"][1] - d["entities"][ia]["p"][1]
     check("LENGTH", near(gx, 40.0, 1e-6), f"horizontal gap driven to {gx:.9f}")
-    check("VERTEX", near(gy, dy_before, 1e-6),
-          f"the vertical gap is untouched at {gy:.9f} — this is not a straight-line distance")
+    check("VERTEX", near(gy, dy_before, 1e-6), f"the vertical gap is untouched at {gy:.9f} — this is not a straight-line distance")
     d2 = confirm_and_reopen()
-    check("CLOSED", d2["solve_ok"] and d2["constraints"] > 0,
-          f"{d2['constraints']} constraints survived the commit")
+    check("CLOSED", d2["solve_ok"] and d2["constraints"] > 0, f"{d2['constraints']} constraints survived the commit")
     leave_sketch()
 
 
@@ -1646,7 +1825,8 @@ def rung_coincident_points():
     ia, ib = d1["entities"].index(ps[0]), d1["entities"].index(ps[1])
     gap0 = math.dist(ps[0]["p"], ps[1]["p"])
     check("VERTEX", gap0 > 1.0, f"they start apart: {gap0:.6f}")
-    clickmm(*ps[0]["p"]); clickmm(*ps[1]["p"])
+    clickmm(*ps[0]["p"])
+    clickmm(*ps[1]["p"])
     click(*CON_BTN["coincident"])
     time.sleep(1.2)
     d = describe()
@@ -1657,11 +1837,13 @@ def rung_coincident_points():
     # session never touches -- it writes the committed feature's entity_constraints. Reading it
     # here says 0 for a constraint that really did land. Same trap the D2 rung documents.
     d2 = confirm_and_reopen()
-    check("CLOSED", d2["solve_ok"] and d2["constraints"] > 0,
-          f"{d2['constraints']} constraints survived the commit — a dropped one leaves this at 0")
+    check(
+        "CLOSED",
+        d2["solve_ok"] and d2["constraints"] > 0,
+        f"{d2['constraints']} constraints survived the commit — a dropped one leaves this at 0",
+    )
     ps2 = [e for e in d2["entities"] if e["type"] == "point"]
-    check("VERTEX", math.dist(ps2[0]["p"], ps2[1]["p"]) < 1e-6,
-          "and they are still joined after the round trip")
+    check("VERTEX", math.dist(ps2[0]["p"], ps2[1]["p"]) < 1e-6, "and they are still joined after the round trip")
     leave_sketch()
 
 
@@ -1679,9 +1861,13 @@ def rung_symmetric_axis():
     d1 = describe()
     ps = [e for e in d1["entities"] if e["type"] == "point"]
     ia, ib = d1["entities"].index(ps[0]), d1["entities"].index(ps[1])
-    check("VERTEX", not near(abs(ps[0]["p"][0]), abs(ps[1]["p"][0]), 1e-3),
-          f"they start unmirrored: x = {ps[0]['p'][0]:.6f}, {ps[1]['p'][0]:.6f}")
-    clickmm(*ps[0]["p"]); clickmm(*ps[1]["p"])
+    check(
+        "VERTEX",
+        not near(abs(ps[0]["p"][0]), abs(ps[1]["p"][0]), 1e-3),
+        f"they start unmirrored: x = {ps[0]['p'][0]:.6f}, {ps[1]['p'][0]:.6f}",
+    )
+    clickmm(*ps[0]["p"])
+    clickmm(*ps[1]["p"])
     click(*CON_BTN["sym_v"])
     time.sleep(1.0)
     d = describe()
@@ -1692,8 +1878,7 @@ def rung_symmetric_axis():
     check("VERTEX", abs(xa) > 1e-6, f"and not both collapsed onto the axis: |x| = {abs(xa):.9f}")
     check("VERTEX", near(ya, yb, 1e-6), f"y untouched on both: {ya:.6f}, {yb:.6f}")
     d2 = confirm_and_reopen()
-    check("CLOSED", d2["solve_ok"] and d2["constraints"] > 0,
-          f"{d2['constraints']} constraints survived the commit")
+    check("CLOSED", d2["solve_ok"] and d2["constraints"] > 0, f"{d2['constraints']} constraints survived the commit")
     leave_sketch()
 
 
@@ -1716,12 +1901,13 @@ def rung_type_guards():
     click(*CON_BTN["horizontal"])
     time.sleep(1.0)
     d = describe()
-    check("VERTEX", near(d["entities"][ia]["p"][0], ps[0]["p"][0], 1e-9) and
-                    near(d["entities"][ia]["p"][1], ps[0]["p"][1], 1e-9),
-          "Horizontal on a point moved nothing, as it must")
+    check(
+        "VERTEX",
+        near(d["entities"][ia]["p"][0], ps[0]["p"][0], 1e-9) and near(d["entities"][ia]["p"][1], ps[0]["p"][1], 1e-9),
+        "Horizontal on a point moved nothing, as it must",
+    )
     d2 = confirm_and_reopen()
-    check("CLOSED", d2["constraints"] == 0,
-          f"and stored NO constraint: {d2['constraints']} (a dead stored one reads 1)")
+    check("CLOSED", d2["constraints"] == 0, f"and stored NO constraint: {d2['constraints']} (a dead stored one reads 1)")
     leave_sketch()
 
     # Angle on two circles: p1-p0 on a circle is (0,0)-centre, so the field used to pre-fill with
@@ -1729,21 +1915,24 @@ def rung_type_guards():
     # axis -- and committing it fed SLVS_C_ANGLE two circle prims, which are not directions.
     reset_document()
     enter_sketch("c")
-    clickmm(-35, 0); clickmm(-20, 0); key("Escape", 0.7)
+    clickmm(-35, 0)
+    clickmm(-20, 0)
+    key("Escape", 0.7)
     key("c", 0.6)
-    clickmm(35, 0); clickmm(60, 0); key("Escape", 0.7)
+    clickmm(35, 0)
+    clickmm(60, 0)
+    key("Escape", 0.7)
     key("k", 1.5)
     d = describe()
     cs = [e for e in d["entities"] if e["type"] == "circle"]
-    clickmm(*rim(cs[0])); clickmm(*rim(cs[1]))
+    clickmm(*rim(cs[0]))
+    clickmm(*rim(cs[1]))
     click(*CON_BTN["angle"])
     time.sleep(1.0)
-    check("ANGLE", not field_open(),
-          "Angle on two circles opened no value field")
+    check("ANGLE", not field_open(), "Angle on two circles opened no value field")
     key("Escape", 0.6)
     d2 = confirm_and_reopen()
-    check("CLOSED", d2["constraints"] == 0,
-          f"and stored no angle: {d2['constraints']}")
+    check("CLOSED", d2["constraints"] == 0, f"and stored no angle: {d2['constraints']}")
     leave_sketch()
 
 
@@ -1751,15 +1940,16 @@ def rung_undo():
     print("\nE1  undo — the last entity goes, the rest do not move")
     enter_sketch("l")
     draw_line(-50, -30, 0, -30, 50, 0)
-    key("l", 0.6); draw_line(0, -30, 0, 20, 50, 90)
-    key("l", 0.6); draw_line(0, 20, -40, 20, 40, 180)
+    key("l", 0.6)
+    draw_line(0, -30, 0, 20, 50, 90)
+    key("l", 0.6)
+    draw_line(0, 20, -40, 20, 40, 180)
     before = describe()["entities"]
     check("LENGTH", len(before) == 3, f"{len(before)} entities drawn")
     key("ctrl+z", 1.0)
     after = describe()["entities"]
     check("VERTEX", len(after) == 2, f"{len(after)} entities after one undo")
-    same = all(math.dist(a["p0"], b["p0"]) == 0.0 and math.dist(a["p1"], b["p1"]) == 0.0
-               for a, b in zip(before, after))
+    same = all(math.dist(a["p0"], b["p0"]) == 0.0 and math.dist(a["p1"], b["p1"]) == 0.0 for a, b in zip(before, after))
     check("VERTEX", same, "the two survivors are bit-identical, not re-solved")
     key("ctrl+z", 1.0)
     check("VERTEX", len(describe()["entities"]) == 1, "a second undo drops one more")
@@ -1783,8 +1973,7 @@ def rung_feature_undo():
     ls = lengths(d["entities"])
     check("LENGTH", ls == [80.0, 80.0, 120.0, 120.0], f"and it is the same rectangle: {ls}")
     lp = d["closed_loops"]
-    check("AREA", len(lp) == 1 and near(abs(lp[0]["area"]), 9600.0, 1e-6),
-          f"area {abs(lp[0]['area']):.6f}")
+    check("AREA", len(lp) == 1 and near(abs(lp[0]["area"]), 9600.0, 1e-6), f"area {abs(lp[0]['area']):.6f}")
     leave_sketch()
     key("ctrl+y", 1.5)
     check("VERTEX", not call("describe_scene")["features"], "redo removes it again")
@@ -1807,7 +1996,7 @@ def file_dialog(path, settle=5.0):
     typ(path, 0.5)
     key("Return", settle)
     global _win
-    _win = None            # saving renames the window; drop the cached geometry
+    _win = None  # saving renames the window; drop the cached geometry
 
 
 def rung_roundtrip():
@@ -1815,8 +2004,14 @@ def rung_roundtrip():
     reset_document()
     enter_sketch("r")
     draw_rect(120, 80, -60, -40)
-    key("r", 0.6); clickmm(-45, -15); clickmm(-5, 15); values(40, 30)
-    key("c", 0.6); clickmm(30, 0); clickmm(42, 0); values(10)
+    key("r", 0.6)
+    clickmm(-45, -15)
+    clickmm(-5, 15)
+    values(40, 30)
+    key("c", 0.6)
+    clickmm(30, 0)
+    clickmm(42, 0)
+    values(10)
     before = describe()
     click(*CONFIRM_BTN, pause=1.5)
     sh(f"rm -f {PROJECT_FILE}")
@@ -1826,23 +2021,38 @@ def rung_roundtrip():
     file_dialog(PROJECT_FILE)
     size = sh(f"stat -c %s {PROJECT_FILE} 2>/dev/null").strip()
     check("CLOSED", size.isdigit() and int(size) > 0, f"project written, {size} bytes")
-    reset_document()                                  # wipe the tree, then read it back off disk
+    reset_document()  # wipe the tree, then read it back off disk
     key("ctrl+o", 2.5)
     file_dialog(PROJECT_FILE, settle=8.0)
-    go_design()                                       # opening a project lands on Prepare
+    go_design()  # opening a project lands on Prepare
     feats = call("describe_scene")["features"]
     check("VERTEX", len(feats) == 1, f"the reloaded document has {len(feats)} feature(s)")
     after = reopen_sketch()
-    b = sorted((e["type"], tuple(round(c, 12) for c in (e.get("p0") or e.get("center") or e.get("p"))),
-                round(e.get("length", e.get("radius", 0.0)), 12)) for e in before["entities"])
-    a = sorted((e["type"], tuple(round(c, 12) for c in (e.get("p0") or e.get("center") or e.get("p"))),
-                round(e.get("length", e.get("radius", 0.0)), 12)) for e in after["entities"])
+    b = sorted(
+        (
+            e["type"],
+            tuple(round(c, 12) for c in (e.get("p0") or e.get("center") or e.get("p"))),
+            round(e.get("length", e.get("radius", 0.0)), 12),
+        )
+        for e in before["entities"]
+    )
+    a = sorted(
+        (
+            e["type"],
+            tuple(round(c, 12) for c in (e.get("p0") or e.get("center") or e.get("p"))),
+            round(e.get("length", e.get("radius", 0.0)), 12),
+        )
+        for e in after["entities"]
+    )
     check("VERTEX", a == b, f"{len(a)} entities identical to 12 decimals after the round trip")
     lp = after["closed_loops"]
     check("CLOSED", len(lp) == 3 and after["buildable"], f"{len(lp)} loops, buildable")
     outer = max(range(len(lp)), key=lambda i: abs(lp[i]["area"]))
-    check("VOID", sorted(lp[outer]["holes"]) == sorted(i for i in range(len(lp)) if i != outer),
-          "the voids are still attributed to the outer loop")
+    check(
+        "VOID",
+        sorted(lp[outer]["holes"]) == sorted(i for i in range(len(lp)) if i != outer),
+        "the voids are still attributed to the outer loop",
+    )
     check("AREA", near(abs(lp[outer]["area"]), 9600.0, 1e-9), f"outer area {abs(lp[outer]['area']):.9f}")
     leave_sketch()
     reset_document()
@@ -1860,10 +2070,12 @@ def rung_scale():
     x0, x1, y0, y1 = _SAFE
     cx, cy = (x0 + x1) / 2.0, (y0 + y1) / 2.0
     hw, hh = (x1 - x0) * 0.44, (y1 - y0) * 0.44
-    ents = [{"type": "line", "p0": [cx - hw, cy - hh], "p1": [cx + hw, cy - hh]},
-            {"type": "line", "p0": [cx + hw, cy - hh], "p1": [cx + hw, cy + hh]},
-            {"type": "line", "p0": [cx + hw, cy + hh], "p1": [cx - hw, cy + hh]},
-            {"type": "line", "p0": [cx - hw, cy + hh], "p1": [cx - hw, cy - hh]}]
+    ents = [
+        {"type": "line", "p0": [cx - hw, cy - hh], "p1": [cx + hw, cy - hh]},
+        {"type": "line", "p0": [cx + hw, cy - hh], "p1": [cx + hw, cy + hh]},
+        {"type": "line", "p0": [cx + hw, cy + hh], "p1": [cx - hw, cy + hh]},
+        {"type": "line", "p0": [cx - hw, cy + hh], "p1": [cx - hw, cy - hh]},
+    ]
     # 300 square cut-outs in the LEFT half; the right half stays clear so the gesture below has
     # somewhere to land that is not within snapping distance of a cut-out corner.
     pitch_x, pitch_y = hw * 0.9 / 20.0, hh * 1.9 / 15.0
@@ -1875,19 +2087,25 @@ def rung_scale():
             c = [(x, y), (x + side, y), (x + side, y + side), (x, y + side), (x, y)]
             for k in range(4):
                 ents.append({"type": "line", "p0": list(c[k]), "p1": list(c[k + 1])})
-    t0 = time.monotonic(); call("sketch_add", entities=ents); t_add = time.monotonic() - t0
+    t0 = time.monotonic()
+    call("sketch_add", entities=ents)
+    t_add = time.monotonic() - t0
     d0 = describe()
-    check("SCALE", len(d0["entities"]) == len(ents), f"{len(d0['entities'])} entities loaded "
-                                                     f"in {t_add*1000:.0f} ms")
+    check("SCALE", len(d0["entities"]) == len(ents), f"{len(d0['entities'])} entities loaded in {t_add * 1000:.0f} ms")
     lp0 = d0["closed_loops"]
     check("CLOSED", len(lp0) == 301, f"{len(lp0)} closed loops")
     outer = max(range(len(lp0)), key=lambda i: abs(lp0[i]["area"]))
-    check("AREA", near(abs(lp0[outer]["area"]), 4.0 * hw * hh, 1e-9),
-          f"outer plate {abs(lp0[outer]['area']):.9f} vs {4.0*hw*hh:.9f}")
-    check("VOID", len(lp0[outer]["holes"]) == 300,
-          f"all {len(lp0[outer]['holes'])} cut-outs attributed to the plate")
-    check("AREA", all(near(abs(lp0[h]["area"]), side * side, 1e-9) for h in lp0[outer]["holes"]),
-          f"every cut-out is exactly {side:.6f} squared")
+    check(
+        "AREA",
+        near(abs(lp0[outer]["area"]), 4.0 * hw * hh, 1e-9),
+        f"outer plate {abs(lp0[outer]['area']):.9f} vs {4.0 * hw * hh:.9f}",
+    )
+    check("VOID", len(lp0[outer]["holes"]) == 300, f"all {len(lp0[outer]['holes'])} cut-outs attributed to the plate")
+    check(
+        "AREA",
+        all(near(abs(lp0[h]["area"]), side * side, 1e-9) for h in lp0[outer]["holes"]),
+        f"every cut-out is exactly {side:.6f} squared",
+    )
     # Now the part that matters: draw ONE more entity by hand, on top of all that.
     #
     # No Escape here, deliberately: this rung is the regression test for j7gc, where a
@@ -1897,27 +2115,33 @@ def rung_scale():
     # add_entities_scripted; if this rung ever needs an Escape again, the bug is back.
     key("l", 0.8)
     global PACE
-    PACE = 6.0                                     # a thousand entities re-solve between fields
+    PACE = 6.0  # a thousand entities re-solve between fields
     t0 = time.monotonic()
-    ax, ay = cx + hw * 0.15, cy + hh * 0.55        # clear of the grid, inside the plate
-    want_len = int(hw * 0.5)                       # a WHOLE number: see value() on separators
-    clickmm(ax, ay); clickmm(ax + want_len, ay)
+    ax, ay = cx + hw * 0.15, cy + hh * 0.55  # clear of the grid, inside the plate
+    want_len = int(hw * 0.5)  # a WHOLE number: see value() on separators
+    clickmm(ax, ay)
+    clickmm(ax + want_len, ay)
     value(want_len)
     dl = describe()
-    say(f"after the typed length: solve_ok={dl['solve_ok']} constraints={dl['constraints']} "
-        f"dof={dl['dof']} entities={len(dl['entities'])}")
+    say(
+        f"after the typed length: solve_ok={dl['solve_ok']} constraints={dl['constraints']} "
+        f"dof={dl['dof']} entities={len(dl['entities'])}"
+    )
     value(0)
     t_draw = time.monotonic() - t0
     d = describe()
-    check("SCALE", len(d["entities"]) == len(ents) + 1,
-          f"the gesture added exactly one entity ({t_draw:.1f} s including four synthetic events)")
+    check(
+        "SCALE",
+        len(d["entities"]) == len(ents) + 1,
+        f"the gesture added exactly one entity ({t_draw:.1f} s including four synthetic events)",
+    )
     new = d["entities"][-1]
-    check("LENGTH", near(new["length"], float(want_len), 1e-9),
-          f"and it took its typed length exactly: {new['length']}")
+    check("LENGTH", near(new["length"], float(want_len), 1e-9), f"and it took its typed length exactly: {new['length']}")
     ang = math.degrees(math.atan2(new["p1"][1] - new["p0"][1], new["p1"][0] - new["p0"][0])) % 360.0
     check("ANGLE", near(ang, 0.0, 1e-9) or near(ang, 360.0, 1e-9), f"and its typed angle: {ang}")
-    same = all(math.dist(a["p0"], b["p0"]) == 0.0 and math.dist(a["p1"], b["p1"]) == 0.0
-               for a, b in zip(d0["entities"], d["entities"]))
+    same = all(
+        math.dist(a["p0"], b["p0"]) == 0.0 and math.dist(a["p1"], b["p1"]) == 0.0 for a, b in zip(d0["entities"], d["entities"])
+    )
     check("VERTEX", same, "and moved none of the thousand entities already there")
     PACE = 1.0
     leave_sketch()
@@ -1925,8 +2149,7 @@ def rung_scale():
 
 def reopen_sketch():
     w, X, Y, _, _ = win()
-    sh(f"DISPLAY={DISP} xdotool mousemove {X+TREE_ROW0[0]} {Y+TREE_ROW0[1]} "
-       f"click --repeat 2 --delay 120 1")
+    sh(f"DISPLAY={DISP} xdotool mousemove {X + TREE_ROW0[0]} {Y + TREE_ROW0[1]} click --repeat 2 --delay 120 1")
     time.sleep(2.0)
     return describe()
 
@@ -1947,11 +2170,13 @@ def rung_mirror_arcs():
     enter_sketch("l")
     click(*CONSTRUCTION_CHECKBOX)
     key("l", 0.6)
-    draw_line(0, -40, 0, 40, 80, 90)                 # the axis, on x = 0
+    draw_line(0, -40, 0, 40, 80, 90)  # the axis, on x = 0
     click(*CONSTRUCTION_CHECKBOX)
-    key("s", 0.6)                                    # slot: two centreline ends, then the width
-    clickmm(-70, -10); clickmm(-30, -10); clickmm(-30, 0)
-    values(40, 10, 0)                                # typed, so the slot is exact before mirroring
+    key("s", 0.6)  # slot: two centreline ends, then the width
+    clickmm(-70, -10)
+    clickmm(-30, -10)
+    clickmm(-30, 0)
+    values(40, 10, 0)  # typed, so the slot is exact before mirroring
     d0 = describe()["entities"]
     axis = [e for e in d0 if e.get("construction")][0]
     slot = [e for e in d0 if not e.get("construction")]
@@ -1963,20 +2188,19 @@ def rung_mirror_arcs():
     for e in slot:
         if e["type"] == "line":
             clickmm(*mid(e))
-        else:                                        # a point ON the arc, at its mid sweep
+        else:  # a point ON the arc, at its mid sweep
             a = (e["start_angle"] + e["end_angle"]) / 2.0
-            clickmm(e["center"][0] + e["radius"] * math.cos(a),
-                    e["center"][1] + e["radius"] * math.sin(a))
-    clickmm(60, 60)                                  # empty space confirms
+            clickmm(e["center"][0] + e["radius"] * math.cos(a), e["center"][1] + e["radius"] * math.sin(a))
+    clickmm(60, 60)  # empty space confirms
     d1 = describe()["entities"]
-    check("VERTEX", len(d1) == len(d0) + len(slot),
-          f"{len(d1) - len(d0)} copies for {len(slot)} picked entities")
+    check("VERTEX", len(d1) == len(d0) + len(slot), f"{len(d1) - len(d0)} copies for {len(slot)} picked entities")
 
     # the sources, entity by entity, must be exactly where they were
     def shape_of(e):
         if e["type"] == "arc":
             return (round(e["radius"], 9), round(abs(e["end_angle"] - e["start_angle"]), 9))
         return (round(math.dist(e["p0"], e["p1"]), 9),)
+
     moved = [i for i, e in enumerate(d0) if shape_of(e) != shape_of(d1[i])]
     check("VERTEX", not moved, f"the mirror left every source alone (moved: {moved})")
 
@@ -1984,45 +2208,79 @@ def rung_mirror_arcs():
     # reverses orientation and legitimately stores p0/p1 the other way round
     (ax, ay), (bx, by) = axis["p0"], axis["p1"]
     dx, dy = bx - ax, by - ay
-    n = math.hypot(dx, dy); dx, dy = dx / n, dy / n
+    n = math.hypot(dx, dy)
+    dx, dy = dx / n, dy / n
+
     def refl(q):
         vx, vy = q[0] - ax, q[1] - ay
         k = 2.0 * (vx * dx + vy * dy)
         return (ax + k * dx - vx, ay + k * dy - vy)
-    copies = d1[len(d0):]
+
+    copies = d1[len(d0) :]
     worst = 0.0
     for e in slot:
-        best = min(max(min(max(math.dist(refl(e["p0"]), c["p0"]), math.dist(refl(e["p1"]), c["p1"])),
-                           max(math.dist(refl(e["p0"]), c["p1"]), math.dist(refl(e["p1"]), c["p0"]))),
-                       abs(shape_of(e)[0] - shape_of(c)[0]))
-                   for c in copies if c["type"] == e["type"])
+        best = min(
+            max(
+                min(
+                    max(math.dist(refl(e["p0"]), c["p0"]), math.dist(refl(e["p1"]), c["p1"])),
+                    max(math.dist(refl(e["p0"]), c["p1"]), math.dist(refl(e["p1"]), c["p0"])),
+                ),
+                abs(shape_of(e)[0] - shape_of(c)[0]),
+            )
+            for c in copies
+            if c["type"] == e["type"]
+        )
         worst = max(worst, best)
     check("SYMMETRY", worst <= 1e-6, f"every copy is the exact reflection (worst {worst:.9f})")
-    reflex = [c for c in copies
-              if c["type"] == "arc" and abs(c["end_angle"] - c["start_angle"]) > math.pi + 1e-9]
+    reflex = [c for c in copies if c["type"] == "arc" and abs(c["end_angle"] - c["start_angle"]) > math.pi + 1e-9]
     check("ARC", not reflex, f"{len(reflex)} copied cap(s) came back reflex — the 'cloud' failure")
 
 
-RUNGS = {"rect": rung_rect, "circle": rung_circle, "line": rung_line, "arc": rung_arc,
-         "slot": rung_slot, "polygon": rung_polygon, "ellipse": rung_ellipse,
-         "point": rung_point, "spline": rung_spline, "voids": rung_voids,
-         "fillet": rung_fillet, "chamfer": rung_chamfer, "offset": rung_offset,
-         "mirror": rung_mirror, "mirror_arcs": rung_mirror_arcs, "trim": rung_trim, "extend": rung_extend,
-         "dimension": rung_dimension, "constrain": rung_constrain,
-         "perpendicular": rung_perpendicular,
-         "equal_radius": rung_equal_radius, "collinear": rung_collinear,
-         "distance_xy": rung_distance_xy, "symmetric_axis": rung_symmetric_axis,
-         "coincident_points": rung_coincident_points,
-         "type_guards": rung_type_guards,
-         "parallel": rung_parallel, "live_constrain": rung_live_constrain,
-         "vertical": rung_vertical, "equal_radius_button": rung_equal_radius_button,
-         "concentric": rung_concentric, "tangent": rung_tangent, "midpoint": rung_midpoint,
-         "symmetric_line_axis": rung_symmetric_line_axis, "symmetric_h": rung_symmetric_h,
-         "radius": rung_radius, "diameter": rung_diameter, "fix": rung_fix,
-         "distance_y": rung_distance_y,
-         "undo": rung_undo,
-         "feature_undo": rung_feature_undo, "roundtrip": rung_roundtrip,
-         "scale": rung_scale}
+RUNGS = {
+    "rect": rung_rect,
+    "circle": rung_circle,
+    "line": rung_line,
+    "arc": rung_arc,
+    "slot": rung_slot,
+    "polygon": rung_polygon,
+    "ellipse": rung_ellipse,
+    "point": rung_point,
+    "spline": rung_spline,
+    "voids": rung_voids,
+    "fillet": rung_fillet,
+    "chamfer": rung_chamfer,
+    "offset": rung_offset,
+    "mirror": rung_mirror,
+    "mirror_arcs": rung_mirror_arcs,
+    "trim": rung_trim,
+    "extend": rung_extend,
+    "dimension": rung_dimension,
+    "constrain": rung_constrain,
+    "perpendicular": rung_perpendicular,
+    "equal_radius": rung_equal_radius,
+    "collinear": rung_collinear,
+    "distance_xy": rung_distance_xy,
+    "symmetric_axis": rung_symmetric_axis,
+    "coincident_points": rung_coincident_points,
+    "type_guards": rung_type_guards,
+    "parallel": rung_parallel,
+    "live_constrain": rung_live_constrain,
+    "vertical": rung_vertical,
+    "equal_radius_button": rung_equal_radius_button,
+    "concentric": rung_concentric,
+    "tangent": rung_tangent,
+    "midpoint": rung_midpoint,
+    "symmetric_line_axis": rung_symmetric_line_axis,
+    "symmetric_h": rung_symmetric_h,
+    "radius": rung_radius,
+    "diameter": rung_diameter,
+    "fix": rung_fix,
+    "distance_y": rung_distance_y,
+    "undo": rung_undo,
+    "feature_undo": rung_feature_undo,
+    "roundtrip": rung_roundtrip,
+    "scale": rung_scale,
+}
 
 
 def main():

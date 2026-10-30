@@ -86,13 +86,23 @@ class TestNamesRemovedInclude(unittest.TestCase):
 
 class TestIsChecked(unittest.TestCase):
     def test_project_sources_and_headers(self):
-        for path in ("src/libslic3r/Color.cpp", "src/slic3r/GUI/Tab.hpp", "tests/fff_print/test_flow.cpp",
-                     "src/libslic3r/Format/bbs_3mf.h"):
+        for path in (
+            "src/libslic3r/Color.cpp",
+            "src/slic3r/GUI/Tab.hpp",
+            "tests/fff_print/test_flow.cpp",
+            "src/libslic3r/Format/bbs_3mf.h",
+        ):
             self.assertTrue(clang_tidy_diff.is_checked(path), path)
 
     def test_vendored_code_other_languages_and_other_dirs(self):
-        for path in ("src/glad/src/gl.c", "src/glad/include/glad/gl.h", "tests/catch2/src/catch.hpp",
-                     "deps_src/imgui/imgui.cpp", "src/slic3r/Utils/MacUtils.mm", "src/CMakeLists.txt"):
+        for path in (
+            "src/glad/src/gl.c",
+            "src/glad/include/glad/gl.h",
+            "tests/catch2/src/catch.hpp",
+            "deps_src/imgui/imgui.cpp",
+            "src/slic3r/Utils/MacUtils.mm",
+            "src/CMakeLists.txt",
+        ):
             self.assertFalse(clang_tidy_diff.is_checked(path), path)
 
 
@@ -128,8 +138,9 @@ class TestParseSuggestedIncludes(unittest.TestCase):
             path = os.path.join(tmp, "fixes.yaml")
             with open(path, "w", encoding="utf-8") as f:
                 f.write(FIXES)
-            self.assertEqual(clang_tidy_diff.parse_suggested_includes(path),
-                             {'no header providing "assert" is directly included': "<cassert>"})
+            self.assertEqual(
+                clang_tidy_diff.parse_suggested_includes(path), {'no header providing "assert" is directly included': "<cassert>"}
+            )
 
     def test_missing_file_means_no_suggestions(self):
         self.assertEqual(clang_tidy_diff.parse_suggested_includes("/nonexistent/fixes.yaml"), {})
@@ -138,17 +149,21 @@ class TestParseSuggestedIncludes(unittest.TestCase):
 class TestSubprocessCalls(unittest.TestCase):
     def run_patched(self, function, *args, returncode=0, stdout=""):
         done = subprocess.CompletedProcess([], returncode, stdout, "")
-        with mock.patch.object(clang_tidy_diff.subprocess, "run", return_value=done) as run, \
-             mock.patch.object(clang_tidy_diff.os.path, "normpath", wraps=os.path.normpath) as normpath:
+        with (
+            mock.patch.object(clang_tidy_diff.subprocess, "run", return_value=done) as run,
+            mock.patch.object(clang_tidy_diff.os.path, "normpath", wraps=os.path.normpath) as normpath,
+        ):
             result = function(*args)
         return result, run.call_args, normpath
 
     def test_line_filter_names_the_file_with_native_separators(self):
-        _, call, normpath = self.run_patched(clang_tidy_diff.run_clang_tidy, "clang-tidy", "build",
-                                             "src/libslic3r/Color.cpp", [[4, 4]], [])
+        _, call, normpath = self.run_patched(
+            clang_tidy_diff.run_clang_tidy, "clang-tidy", "build", "src/libslic3r/Color.cpp", [[4, 4]], []
+        )
         line_filter = next(arg for arg in call.args[0] if arg.startswith("--line-filter="))
-        self.assertEqual(json.loads(line_filter.split("=", 1)[1]),
-                         [{"name": os.path.join("src", "libslic3r", "Color.cpp"), "lines": [[4, 4]]}])
+        self.assertEqual(
+            json.loads(line_filter.split("=", 1)[1]), [{"name": os.path.join("src", "libslic3r", "Color.cpp"), "lines": [[4, 4]]}]
+        )
         normpath.assert_any_call("src/libslic3r/Color.cpp")
 
     def test_changed_files_reads_non_ascii_paths_and_text_as_utf8(self):
@@ -161,11 +176,11 @@ class TestSubprocessCalls(unittest.TestCase):
         self.assertEqual(files["src/libslic3r/Über.cpp"].lines, [[2, 2]])
 
     def test_clang_tidy_and_git_show_output_is_decoded_as_utf8(self):
-        _, call, _ = self.run_patched(clang_tidy_diff.run_clang_tidy, "clang-tidy", "build",
-                                      "src/libslic3r/Color.cpp", None, [])
+        _, call, _ = self.run_patched(clang_tidy_diff.run_clang_tidy, "clang-tidy", "build", "src/libslic3r/Color.cpp", None, [])
         self.assertEqual(call.kwargs["encoding"], "utf-8")
-        _, call, _ = self.run_patched(clang_tidy_diff.errors_alone_at, "base", "clang-tidy", "build",
-                                      "src/libslic3r/Color.hpp", returncode=128)
+        _, call, _ = self.run_patched(
+            clang_tidy_diff.errors_alone_at, "base", "clang-tidy", "build", "src/libslic3r/Color.hpp", returncode=128
+        )
         self.assertEqual(call.kwargs["encoding"], "utf-8")
 
 
@@ -180,8 +195,9 @@ class TestCheckFileFix(unittest.TestCase):
             f.write("int x;\n")
 
     def finding(self, line, include=""):
-        return clang_tidy_diff.Diagnostic(self.path, line, 1, "error",
-                                          'no header providing "x" is directly included [misc-include-cleaner]', include)
+        return clang_tidy_diff.Diagnostic(
+            self.path, line, 1, "error", 'no header providing "x" is directly included [misc-include-cleaner]', include
+        )
 
     def check(self, change, results, fix_writes=None):
         """Run check_file with run_clang_tidy answering from `results` in turn; the --fix run
@@ -204,7 +220,10 @@ class TestCheckFileFix(unittest.TestCase):
         orphaned = self.finding(50, "<libslic3r/Point.hpp>")
         unrelated = self.finding(60, "<vector>")
         (failed, _, failing, fixed), calls = self.check(
-            change, [(1, "", [orphaned, unrelated]), (1, "", [orphaned]), (0, "", [])], fix_writes="#include <libslic3r/Point.hpp>\n")
+            change,
+            [(1, "", [orphaned, unrelated]), (1, "", [orphaned]), (0, "", [])],
+            fix_writes="#include <libslic3r/Point.hpp>\n",
+        )
         self.assertEqual(calls, [(None, []), ([[4, 4], [50, 50]], ["--fix"]), (None, [])])
         self.assertEqual((failed, failing, fixed), (False, [], True))
 
@@ -219,7 +238,8 @@ class TestCheckFileFix(unittest.TestCase):
         change = clang_tidy_diff.FileChange(lines=[[4, 4]])
         error = clang_tidy_diff.Diagnostic(self.path, 4, 1, "error", "unknown type name 'Foo' [clang-diagnostic-error]")
         (failed, _, failing, fixed), calls = self.check(
-            change, [(1, "", [self.finding(4, "<vector>"), error]), (1, "", [error])], fix_writes="#include <vector>\n")
+            change, [(1, "", [self.finding(4, "<vector>"), error]), (1, "", [error])], fix_writes="#include <vector>\n"
+        )
         self.assertEqual(calls, [([[4, 4]], ["--fix"]), ([[4, 4]], [])])
         self.assertEqual((failed, failing, fixed), (True, [error], True))
 

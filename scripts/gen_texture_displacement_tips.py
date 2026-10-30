@@ -304,9 +304,12 @@ def neighbours(tris):
 def draw_mesh(draw, size, tris, painted=None, edge=INK, edge_width=0.7):
     fill_bare, fill_paint = _rgb255(BARE), _rgb255(PAINT)
     for i, t in enumerate(tris):
-        draw.polygon([_px(p, size) for p in t],
-                     fill=fill_paint if painted is not None and painted[i] else fill_bare,
-                     outline=_rgb255(edge), width=max(1, int(edge_width * SS)))
+        draw.polygon(
+            [_px(p, size) for p in t],
+            fill=fill_paint if painted is not None and painted[i] else fill_bare,
+            outline=_rgb255(edge),
+            width=max(1, int(edge_width * SS)),
+        )
 
 
 def draw_brush(draw, size, centre, radius, filled=False):
@@ -322,10 +325,20 @@ def draw_pointer(draw, size, at):
     """A small arrow, for the tools that are clicked rather than dragged."""
     x, y = _px(at, size)
     k = 0.055 * size
-    draw.polygon([(x, y), (x, y + 1.45 * k), (x + 0.38 * k, y + 1.05 * k),
-                  (x + 0.62 * k, y + 1.55 * k), (x + 0.90 * k, y + 1.40 * k),
-                  (x + 0.66 * k, y + 0.92 * k), (x + 1.05 * k, y + 0.84 * k)],
-                 fill=_rgb255(CURSOR), outline=(30, 32, 34), width=max(1, int(0.9 * SS)))
+    draw.polygon(
+        [
+            (x, y),
+            (x, y + 1.45 * k),
+            (x + 0.38 * k, y + 1.05 * k),
+            (x + 0.62 * k, y + 1.55 * k),
+            (x + 0.90 * k, y + 1.40 * k),
+            (x + 0.66 * k, y + 0.92 * k),
+            (x + 1.05 * k, y + 0.84 * k),
+        ],
+        fill=_rgb255(CURSOR),
+        outline=(30, 32, 34),
+        width=max(1, int(0.9 * SS)),
+    )
 
 
 def stroke_path(t):
@@ -382,9 +395,16 @@ def flood_frames(size, creases, steps=12, hold=3, seed=7):
     frames = []
     for _ in range(steps):
         state = painted.copy()
-        frames.append(raster(lambda d, s, st=state: (draw_mesh(d, s, tris, st),
-                                                     draw_creases(d, s, creases),
-                                                     draw_pointer(d, s, cents[seed_tri])), size))
+        frames.append(
+            raster(
+                lambda d, s, st=state: (
+                    draw_mesh(d, s, tris, st),
+                    draw_creases(d, s, creases),
+                    draw_pointer(d, s, cents[seed_tri]),
+                ),
+                size,
+            )
+        )
         nxt = []
         for i in frontier:
             for j in adj[i]:
@@ -402,7 +422,6 @@ def draw_creases(draw, size, creases):
         a, b = _px((x, -0.02), size), _px((x, 1.02), size)
         draw.line([a, b], fill=_rgb255((0.08, 0.09, 0.10)), width=max(1, int(4.0 * SS)))
         draw.line([a, b], fill=_rgb255((0.97, 0.99, 0.99)), width=max(1, int(1.4 * SS)))
-
 
 
 def split4(tri):
@@ -569,7 +588,7 @@ def projected_sphere(kind, size=SIZE, squares=9):
     z = np.sqrt(np.clip(1.0 - x * x - y * y, 0.0, 1.0))
 
     lam = np.clip(x * LIGHT[0] + y * LIGHT[1] + z * LIGHT[2], 0.0, 1.0)
-    rgb = SHADOW + (HIGHLIGHT - SHADOW) * (lam ** 0.85)[..., None]
+    rgb = SHADOW + (HIGHLIGHT - SHADOW) * (lam**0.85)[..., None]
 
     around = np.arctan2(x, z) / (2.0 * np.pi) + 0.5
     if kind == "sphere":
@@ -601,26 +620,35 @@ def uv_islands(size=SIZE, squares=9, seed=12):
     rng = np.random.default_rng(seed)
     x, y = grid(size)
     cells = (np.floor((x + 0.5) * squares * 2.0) + np.floor((y + 0.5) * squares)) % 2.0
-    checker = (np.array([0.40, 0.43, 0.43]) + np.array([0.22, 0.24, 0.24]) * (1.0 - cells)[..., None])
+    checker = np.array([0.40, 0.43, 0.43]) + np.array([0.22, 0.24, 0.24]) * (1.0 - cells)[..., None]
 
     def blob(centre, radius, lobes):
         angles = np.linspace(0.0, 2.0 * np.pi, 26, endpoint=False)
         wobble = 1.0 + 0.22 * np.sin(lobes * angles + rng.random() * 6.0)
-        return [(centre[0] + np.cos(t) * radius * w, centre[1] + np.sin(t) * radius * w)
-                for t, w in zip(angles, wobble)]
+        return [(centre[0] + np.cos(t) * radius * w, centre[1] + np.sin(t) * radius * w) for t, w in zip(angles, wobble)]
 
-    islands = [blob((0.31, 0.32), 0.21, 3), blob((0.72, 0.30), 0.17, 4),
-               blob((0.34, 0.74), 0.17, 4), blob((0.72, 0.71), 0.20, 3)]
+    islands = [blob((0.31, 0.32), 0.21, 3), blob((0.72, 0.30), 0.17, 4), blob((0.34, 0.74), 0.17, 4), blob((0.72, 0.71), 0.20, 3)]
 
-    mask = np.asarray(raster(lambda d, px: [d.polygon([(p[0] * px, p[1] * px) for p in island], fill=(255, 255, 255))
-                                            for island in islands],
-                             size, background=(0.0, 0.0, 0.0))).astype(float)[..., 0] / 255.0
+    mask = (
+        np.asarray(
+            raster(
+                lambda d, px: [d.polygon([(p[0] * px, p[1] * px) for p in island], fill=(255, 255, 255)) for island in islands],
+                size,
+                background=(0.0, 0.0, 0.0),
+            )
+        ).astype(float)[..., 0]
+        / 255.0
+    )
     rgb = checker * mask[..., None] + np.array([0.13, 0.14, 0.15]) * (1.0 - mask)[..., None]
     out = (np.clip(rgb, 0.0, 1.0) * 255.0 + 0.5).astype(np.uint8)
-    return raster(lambda d, px: [d.polygon([(p[0] * px, p[1] * px) for p in island], outline=_rgb255(INK),
-                                           width=max(1, int(1.1 * SS)))
-                                 for island in islands],
-                  size, background=out)
+    return raster(
+        lambda d, px: [
+            d.polygon([(p[0] * px, p[1] * px) for p in island], outline=_rgb255(INK), width=max(1, int(1.1 * SS)))
+            for island in islands
+        ],
+        size,
+        background=out,
+    )
 
 
 def main():
@@ -699,8 +727,9 @@ def main():
     for i in range(steps):
         r = 0.07 + 0.16 * (0.5 - 0.5 * np.cos(2.0 * np.pi * i / steps))
         under = np.linalg.norm(brush_cents - np.array([0.5, 0.5]), axis=1) < r
-        frames.append(raster(lambda d, sz, u=under, rr=r: (draw_mesh(d, sz, brush_tris, u),
-                                                           draw_brush(d, sz, (0.5, 0.5), rr)), GIF_SIZE))
+        frames.append(
+            raster(lambda d, sz, u=under, rr=r: (draw_mesh(d, sz, brush_tris, u), draw_brush(d, sz, (0.5, 0.5), rr)), GIF_SIZE)
+        )
     save_gif("cursor_size.gif", frames, delay_ms=90)
 
     # Angle threshold: the same fill, let past one fold and then past both.
@@ -721,8 +750,10 @@ def main():
     plain = shade(0.25 + 0.5 * dome())
     save_png("view_checker.png", with_checker(plain, squares=7, strength=0.40))
     save_png("view_distortion.png", with_checker(plain, squares=7, strength=0.40, warp=True))
-    save_png("view_wireframe.png", raster(lambda d, sz: draw_mesh_lines(d, sz, tri_mesh(9, jitter=0.55, seed=2)),
-                                          SIZE, background=relief))
+    save_png(
+        "view_wireframe.png",
+        raster(lambda d, sz: draw_mesh_lines(d, sz, tri_mesh(9, jitter=0.55, seed=2)), SIZE, background=relief),
+    )
 
     # The projections: one ball, the checker put on it five different ways.
     for kind in ("cube", "cylinder", "sphere", "view"):
@@ -737,13 +768,17 @@ def main():
 
     disc = sampler(painted_area(192, radius=0.34))
     painted_mesh = refine(coarse, disc, 3)
-    save_png("painted_only_on.png",
-             raster(lambda d, sz: draw_mesh(d, sz, painted_mesh,
-                                            np.array([disc(*np.mean(t, axis=0)) > 0.5 for t in painted_mesh])), SIZE))
+    save_png(
+        "painted_only_on.png",
+        raster(
+            lambda d, sz: draw_mesh(d, sz, painted_mesh, np.array([disc(*np.mean(t, axis=0)) > 0.5 for t in painted_mesh])), SIZE
+        ),
+    )
     everywhere = refine(coarse, lambda x, y: 1.0, 3)
-    save_png("painted_only_off.png",
-             raster(lambda d, sz: draw_mesh(d, sz, everywhere,
-                                            np.array([disc(*np.mean(t, axis=0)) > 0.5 for t in everywhere])), SIZE))
+    save_png(
+        "painted_only_off.png",
+        raster(lambda d, sz: draw_mesh(d, sz, everywhere, np.array([disc(*np.mean(t, axis=0)) > 0.5 for t in everywhere])), SIZE),
+    )
 
     # Subdivide: every triangle into four, a step at a time.
     level = tri_mesh(2)
@@ -760,11 +795,11 @@ def main():
     # Hard edges: a fold the remesh runs across, against one it lays its edges along.
     crease = ((0.06, 0.84), (0.94, 0.20))
     across = tri_mesh(5, jitter=0.45, seed=6)
-    save_png("preserve_edges_off.png",
-             raster(lambda d, sz: (draw_mesh(d, sz, across), draw_line(d, sz, crease)), SIZE))
-    save_png("preserve_edges_on.png",
-             raster(lambda d, sz: (draw_mesh(d, sz, snap_to_crease(across, crease, 0.13)),
-                                   draw_line(d, sz, crease)), SIZE))
+    save_png("preserve_edges_off.png", raster(lambda d, sz: (draw_mesh(d, sz, across), draw_line(d, sz, crease)), SIZE))
+    save_png(
+        "preserve_edges_on.png",
+        raster(lambda d, sz: (draw_mesh(d, sz, snap_to_crease(across, crease, 0.13)), draw_line(d, sz, crease)), SIZE),
+    )
 
     # Thin triangles, and the same mesh without them.
     save_png("collapse_slivers_off.png", raster(lambda d, sz: draw_mesh(d, sz, sliver_mesh()), SIZE))

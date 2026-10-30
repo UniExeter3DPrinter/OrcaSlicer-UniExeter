@@ -36,8 +36,8 @@ import tempfile
 import time
 
 SOCK = os.environ.get("ORCA_CAD_MCP", "/tmp/mcp.sock")
-TOL = 1e-6          # exact-comparison tolerance (all inputs are lines)
-WELD = 0.05         # endpoint-coincidence tolerance, in PDF units
+TOL = 1e-6  # exact-comparison tolerance (all inputs are lines)
+WELD = 0.05  # endpoint-coincidence tolerance, in PDF units
 
 
 # ── the socket ───────────────────────────────────────────────────────────────
@@ -54,8 +54,7 @@ def try_call(method, **params):
 
 def call(method, **params):
     _id[0] += 1
-    req = json.dumps({"jsonrpc": "2.0", "id": _id[0], "method": method,
-                      "params": params}) + "\n"
+    req = json.dumps({"jsonrpc": "2.0", "id": _id[0], "method": method, "params": params}) + "\n"
     s = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
     s.settimeout(30)
     s.connect(SOCK)
@@ -85,10 +84,8 @@ def bezier(p0, p1, p2, p3, n=16):
         pts = []
         for t in (t0, t1):
             u = 1 - t
-            x = (u ** 3 * p0[0] + 3 * u * u * t * p1[0]
-                 + 3 * u * t * t * p2[0] + t ** 3 * p3[0])
-            y = (u ** 3 * p0[1] + 3 * u * u * t * p1[1]
-                 + 3 * u * t * t * p2[1] + t ** 3 * p3[1])
+            x = u**3 * p0[0] + 3 * u * u * t * p1[0] + 3 * u * t * t * p2[0] + t**3 * p3[0]
+            y = u**3 * p0[1] + 3 * u * u * t * p1[1] + 3 * u * t * t * p2[1] + t**3 * p3[1]
             pts.append((x, y))
         out.append((pts[0], pts[1]))
     return out
@@ -108,15 +105,22 @@ def path_segments(d):
             i += 1
         # numbers repeat the previous command, as SVG allows
         if cmd in ("M", "m"):
-            x, y = flat[i], flat[i + 1]; i += 2
-            cur = (x, y); start = cur
+            x, y = flat[i], flat[i + 1]
+            i += 2
+            cur = (x, y)
+            start = cur
         elif cmd in ("L", "l"):
-            x, y = flat[i], flat[i + 1]; i += 2
-            segs.append((cur, (x, y))); cur = (x, y)
+            x, y = flat[i], flat[i + 1]
+            i += 2
+            segs.append((cur, (x, y)))
+            cur = (x, y)
         elif cmd in ("C", "c"):
-            p1 = (flat[i], flat[i + 1]); p2 = (flat[i + 2], flat[i + 3])
-            p3 = (flat[i + 4], flat[i + 5]); i += 6
-            segs.extend(bezier(cur, p1, p2, p3)); cur = p3
+            p1 = (flat[i], flat[i + 1])
+            p2 = (flat[i + 2], flat[i + 3])
+            p3 = (flat[i + 4], flat[i + 5])
+            i += 6
+            segs.extend(bezier(cur, p1, p2, p3))
+            cur = p3
         elif cmd in ("Z", "z"):
             if cur and start and dist(cur, start) > TOL:
                 segs.append((cur, start))
@@ -134,8 +138,7 @@ def drawing_segments(pdf):
     """Every stroked segment on the sheet, in PDF units (y already flipped up)."""
     with tempfile.TemporaryDirectory() as td:
         svg = os.path.join(td, "p.svg")
-        subprocess.run(["pdftocairo", "-svg", pdf, svg],
-                       check=True, capture_output=True)
+        subprocess.run(["pdftocairo", "-svg", pdf, svg], check=True, capture_output=True)
         s = open(svg).read()
     segs = []
     # Drawn geometry is stroked with no fill; glyphs are filled with no stroke.
@@ -164,7 +167,7 @@ def find_loops(segs):
         used.add(i0)
         while True:
             nxt = None
-            for (j, p, q) in adj.get(key(cur), []):
+            for j, p, q in adj.get(key(cur), []):
                 if j in used:
                     continue
                 nxt = (j, q)
@@ -197,8 +200,7 @@ def point_in(pt, ring):
     inside = False
     for i in range(len(ring) - 1):
         A, B = ring[i], ring[i + 1]
-        if (A[1] > pt[1]) != (B[1] > pt[1]) and \
-           pt[0] < (B[0] - A[0]) * (pt[1] - A[1]) / (B[1] - A[1]) + A[0]:
+        if (A[1] > pt[1]) != (B[1] > pt[1]) and pt[0] < (B[0] - A[0]) * (pt[1] - A[1]) / (B[1] - A[1]) + A[0]:
             inside = not inside
     return inside
 
@@ -242,15 +244,13 @@ def grade(pdf, name, report):
     # largest loop that is NOT the frame, plus every loop contained in it.
     loops.sort(key=shoelace, reverse=True)
     outer = loops[1]
-    voids = [r for r in loops[2:]
-             if shoelace(r) > 1.0 and point_in(r[0], outer)]
+    voids = [r for r in loops[2:] if shoelace(r) > 1.0 and point_in(r[0], outer)]
     if shoelace(outer) < 100.0:
         # Not a defect and not a near miss: on these sheets the part outline is not a closed
         # stroked path at all, so the only loops extraction recovers are glyph counters and
         # arrowheads. Measured on MPD12/30/31/60: the LARGEST loop on the sheet is 5 to 132 mm2.
         # Say the number, so nobody has to re-measure to know which kind of skip this is.
-        report(name, "SKIP", f"no part outline on this sheet — largest loop is only "
-                             f"{shoelace(outer):.1f} mm2")
+        report(name, "SKIP", f"no part outline on this sheet — largest loop is only {shoelace(outer):.1f} mm2")
         return None
 
     # Feed the drawing's own geometry to the engine, as lines only.
@@ -258,9 +258,7 @@ def grade(pdf, name, report):
     rings = [outer] + voids
     for ring in rings:
         for i in range(len(ring) - 1):
-            ents.append({"type": "line",
-                         "p0": [ring[i][0], ring[i][1]],
-                         "p1": [ring[i + 1][0], ring[i + 1][1]]})
+            ents.append({"type": "line", "p0": [ring[i][0], ring[i][1]], "p1": [ring[i + 1][0], ring[i + 1][1]]})
     try_call("sketch_cancel")
     call("sketch_begin", plane="XY")
     call("sketch_add", entities=ents)
@@ -268,8 +266,7 @@ def grade(pdf, name, report):
 
     ok = True
     got = r["closed_loops"]
-    ok &= report(name, "CLOSED", f"engine finds {len(got)} closed loops, this script "
-                                f"finds {len(rings)}", len(got) == len(rings))
+    ok &= report(name, "CLOSED", f"engine finds {len(got)} closed loops, this script finds {len(rings)}", len(got) == len(rings))
 
     # AREA — exact, because every entity is a line
     mine = sorted(shoelace(x) for x in rings)
@@ -280,8 +277,7 @@ def grade(pdf, name, report):
     # have caught the real defect this rung was written for: with the old 3 degree gesture
     # slack applied to scripted input, a flattened circle came back 0.067% small — 0.266 on
     # an area of 397, some 300x above this line.
-    same = len(mine) == len(theirs) and all(
-        abs(a - b) <= max(1e-3, 1e-6 * a) for a, b in zip(mine, theirs))
+    same = len(mine) == len(theirs) and all(abs(a - b) <= max(1e-3, 1e-6 * a) for a, b in zip(mine, theirs))
     ok &= report(name, "AREA", "every loop area matches the shoelace value exactly", same)
 
     # VOID — a loop belongs to the SMALLEST loop that contains it, not to every loop that
@@ -312,9 +308,9 @@ def grade(pdf, name, report):
         # match engine loops to my rings by area, then compare the two attributions by COUNT
         mine_counts = sorted(len(v) for v in mine_parent.values())
         got_counts = sorted(len(l["holes"]) for l in got if l["holes"])
-        ok &= report(name, "VOID",
-                     f"void attribution matches: engine {got_counts}, containment "
-                     f"{mine_counts}", got_counts == mine_counts)
+        ok &= report(
+            name, "VOID", f"void attribution matches: engine {got_counts}, containment {mine_counts}", got_counts == mine_counts
+        )
 
     # MIRROR / OFFSET — engine operations on a REAL profile, not a tidy one
     n_outer = len(outer) - 1
@@ -327,8 +323,7 @@ def grade(pdf, name, report):
     try:
         call("sketch_mirror", axis_a=[axis, 0], axis_b=[axis, 1])
         m = call("sketch_describe")
-        ok &= report(name, "MIRROR", "the mirrored copy is closed too",
-                     len(m["closed_loops"]) == 2 and m["open_ends"] == [])
+        ok &= report(name, "MIRROR", "the mirrored copy is closed too", len(m["closed_loops"]) == 2 and m["open_ends"] == [])
     except RuntimeError as e:
         ok &= report(name, "MIRROR", f"refused: {e}", False)
 
@@ -338,8 +333,7 @@ def grade(pdf, name, report):
     try:
         call("sketch_offset", distance=0.5, entities=list(range(n_outer)))
         o = call("sketch_describe")
-        ok &= report(name, "OFFSET", "the offset profile is still closed",
-                     any(l["closed"] for l in o["closed_loops"]))
+        ok &= report(name, "OFFSET", "the offset profile is still closed", any(l["closed"] for l in o["closed_loops"]))
     except RuntimeError as e:
         ok &= report(name, "OFFSET", f"refused: {e}", False)
     return ok
@@ -365,35 +359,43 @@ def grade_scale(pdf, name, report, budget):
     ents = []
     for ring in rings:
         for i in range(len(ring) - 1):
-            ents.append({"type": "line",
-                         "p0": [ring[i][0], ring[i][1]],
-                         "p1": [ring[i + 1][0], ring[i + 1][1]]})
+            ents.append({"type": "line", "p0": [ring[i][0], ring[i][1]], "p1": [ring[i + 1][0], ring[i + 1][1]]})
     if len(ents) < 300:
         report(name, "SKIP", f"only {len(ents)} entities — not a scale case")
         return None
 
     try_call("sketch_cancel")
     call("sketch_begin", plane="XY")
-    t0 = time.monotonic(); call("sketch_add", entities=ents);  t_add = time.monotonic() - t0
-    t0 = time.monotonic(); r = call("sketch_describe");        t_desc = time.monotonic() - t0
-    t0 = time.monotonic(); call("sketch_select", entities=list(range(len(ents))))
+    t0 = time.monotonic()
+    call("sketch_add", entities=ents)
+    t_add = time.monotonic() - t0
+    t0 = time.monotonic()
+    r = call("sketch_describe")
+    t_desc = time.monotonic() - t0
+    t0 = time.monotonic()
+    call("sketch_select", entities=list(range(len(ents))))
     t_sel = time.monotonic() - t0
-    t0 = time.monotonic(); call("sketch_validate");            t_val = time.monotonic() - t0
+    t0 = time.monotonic()
+    call("sketch_validate")
+    t_val = time.monotonic() - t0
 
     ok = True
     ok &= report(name, "SCALE", f"{len(ents)} entities in {len(rings)} loops", True)
     got = r["closed_loops"]
-    ok &= report(name, "CLOSED", f"engine finds {len(got)} closed loops, this script "
-                                 f"finds {len(rings)}", len(got) == len(rings))
+    ok &= report(name, "CLOSED", f"engine finds {len(got)} closed loops, this script finds {len(rings)}", len(got) == len(rings))
     mine = sorted(shoelace(x) for x in rings)
     theirs = sorted(abs(l["area"]) for l in got)
-    same = len(mine) == len(theirs) and all(
-        abs(a - b) <= max(1e-3, 1e-6 * a) for a, b in zip(mine, theirs))
+    same = len(mine) == len(theirs) and all(abs(a - b) <= max(1e-3, 1e-6 * a) for a, b in zip(mine, theirs))
     ok &= report(name, "AREA", "every loop area matches the shoelace value exactly", same)
     worst = max(t_add, t_desc, t_sel, t_val)
-    ok &= report(name, "TIME", f"add {t_add*1000:.0f} ms, describe {t_desc*1000:.0f} ms, "
-                               f"select {t_sel*1000:.0f} ms, validate {t_val*1000:.0f} ms "
-                               f"(budget {budget*1000:.0f} ms)", worst <= budget)
+    ok &= report(
+        name,
+        "TIME",
+        f"add {t_add * 1000:.0f} ms, describe {t_desc * 1000:.0f} ms, "
+        f"select {t_sel * 1000:.0f} ms, validate {t_val * 1000:.0f} ms "
+        f"(budget {budget * 1000:.0f} ms)",
+        worst <= budget,
+    )
     return ok
 
 
@@ -408,10 +410,8 @@ def main():
     ap.add_argument("--corpus", default=os.path.expanduser("~/studycadcam"))
     ap.add_argument("--step", type=int, default=20)
     ap.add_argument("--limit", type=int, default=0)
-    ap.add_argument("--scale", action="store_true",
-                    help="grade the LARGEST drawings instead: exactness plus a UI-thread budget")
-    ap.add_argument("--budget", type=float, default=2.0,
-                    help="seconds; the slowest round trip a scale drawing may take")
+    ap.add_argument("--scale", action="store_true", help="grade the LARGEST drawings instead: exactness plus a UI-thread budget")
+    ap.add_argument("--budget", type=float, default=2.0, help="seconds; the slowest round trip a scale drawing may take")
     a = ap.parse_args()
 
     files = {}
@@ -436,14 +436,13 @@ def main():
                 outer = loops[1]
                 voids = [r for r in loops[2:] if shoelace(r) > 1.0 and point_in(r[0], outer)]
                 sized.append((sum(len(r) - 1 for r in [outer] + voids), f))
-            except Exception:                        # noqa: BLE001
+            except Exception:  # noqa: BLE001
                 continue
         sized.sort(reverse=True)
-        picks = [f for _, f in sized[:max(1, a.limit or 6)]]
+        picks = [f for _, f in sized[: max(1, a.limit or 6)]]
     elif a.limit:
-        picks = picks[:a.limit]
-    print(f"corpus: {len(files)} sheets;  systematic sample every {a.step}th "
-          f"-> {len(picks)} drawings\n")
+        picks = picks[: a.limit]
+    print(f"corpus: {len(files)} sheets;  systematic sample every {a.step}th -> {len(picks)} drawings\n")
 
     fails, results = [], []
 
@@ -460,11 +459,10 @@ def main():
     for f in picks:
         name = re.search(r"MPD\d+", os.path.basename(f)).group(0)
         try:
-            r = (grade_scale(f, name, report, a.budget) if a.scale
-                 else grade(f, name, report))
+            r = grade_scale(f, name, report, a.budget) if a.scale else grade(f, name, report)
             if r is not None:
                 results.append((name, r))
-        except Exception as e:                       # noqa: BLE001
+        except Exception as e:  # noqa: BLE001
             # An unreadable SOURCE file is not a grading failure. MPD133 of this corpus is
             # password-protected, and pdftocairo says so on stderr while exiting non-zero;
             # reporting that as ERROR made one encrypted sheet look like an engine defect.
@@ -478,8 +476,7 @@ def main():
     if graded == 0:
         print("\nNOTHING WAS GRADED — that is a harness failure, not a clean run", file=sys.stderr)
         sys.exit(2)
-    print(f"\ngraded {graded} drawings; {passed} fully clean, {graded - passed} with "
-          f"at least one failure")
+    print(f"\ngraded {graded} drawings; {passed} fully clean, {graded - passed} with at least one failure")
     if fails:
         print("\nfailures:")
         for x in fails:

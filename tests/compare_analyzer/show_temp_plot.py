@@ -11,7 +11,7 @@ ARCHITECTURE & MAPPING LOGIC:
   - Heater 0: Extruder 2 (physical RIGHT nozzle slot, T0/T2/T3/T4)
   - Heater 1: Extruder 1 (physical LEFT nozzle slot, T1)
 - The active heater mapping is derived dynamically based on active G-code temperature signals:
-  - When filament X is active and heater N is heated to printing temperature (>200°C), 
+  - When filament X is active and heater N is heated to printing temperature (>200°C),
     we associate filament X with heater N.
 
 ================================================================================
@@ -32,12 +32,13 @@ Output:
   ~/Desktop/temp_plot.html
 - Opens the HTML report in the system's default web browser immediately.
 """
-import sys
-import os
-import zipfile
+
 import json
-import xml.etree.ElementTree as ET
+import os
+import sys
 import webbrowser
+import xml.etree.ElementTree as ET
+import zipfile
 
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 try:
@@ -68,15 +69,15 @@ def parse_filaments_and_colors(zip_file):
 def parse_nozzle_groups(zip_file):
     """
     Parse filament-to-extruder mapping from filament_maps in slice_info.config.
-    
+
     filament_maps = "2 1 2 2 2" → {0: 2, 1: 1, 2: 2, 3: 2, 4: 2}
-    
+
     Returns:
         extruder_map: {filament_id_0based: extruder_id}
         extruder_groups: {extruder_id: [list of filament IDs 0-based]}
     """
     extruder_map = {}
-    
+
     try:
         xml_data = zip_file.read("Metadata/slice_info.config").decode("utf-8", errors="replace")
         root = ET.fromstring(xml_data)
@@ -91,11 +92,11 @@ def parse_nozzle_groups(zip_file):
                     break
     except Exception as e:
         print(f"  Warning: could not parse filament_maps: {e}")
-    
+
     extruder_groups = {}
     for fid, eid in extruder_map.items():
         extruder_groups.setdefault(eid, []).append(fid)
-    
+
     return extruder_map, extruder_groups
 
 
@@ -104,8 +105,7 @@ def determine_heater_to_extruder(track, extruder_map):
     return {1: 1, 2: 0}
 
 
-def build_timeline_and_interpolate(track, tool_changes, m73_points, total_lines, m400_weights=None,
-                                    gcode_lines=None):
+def build_timeline_and_interpolate(track, tool_changes, m73_points, total_lines, m400_weights=None, gcode_lines=None):
     """Build a line→time mapping from physical G1 motion time estimation.
 
     When *gcode_lines* is provided (list of raw gcode strings, 0-indexed),
@@ -113,8 +113,8 @@ def build_timeline_and_interpolate(track, tool_changes, m73_points, total_lines,
     physically accurate time axis independent of M73 granularity.
     Falls back to M73 interpolation when gcode_lines is not available.
     """
-    import re as _re
     import math as _math
+    import re as _re
 
     if m400_weights is None:
         m400_weights = {}
@@ -131,28 +131,28 @@ def build_timeline_and_interpolate(track, tool_changes, m73_points, total_lines,
             gl = raw.strip()
 
             # M400 S/P delays
-            ms = _re.match(r'^M400\s+S([\d.]+)', gl)
-            mp = _re.match(r'^M400\s+P([\d.]+)', gl)
+            ms = _re.match(r"^M400\s+S([\d.]+)", gl)
+            mp = _re.match(r"^M400\s+P([\d.]+)", gl)
             if ms:
                 t += float(ms.group(1))
             elif mp:
                 t += float(mp.group(1)) / 1000.0
 
             # G1 moves
-            if gl.startswith('G1 '):
-                fm = _re.search(r'F([\d.]+)', gl)
+            if gl.startswith("G1 "):
+                fm = _re.search(r"F([\d.]+)", gl)
                 if fm:
                     cur_f = float(fm.group(1))
 
-                xm = _re.search(r'X([-\d.]+)', gl)
-                ym = _re.search(r'Y([-\d.]+)', gl)
-                zm = _re.search(r'Z([-\d.]+)', gl)
+                xm = _re.search(r"X([-\d.]+)", gl)
+                ym = _re.search(r"Y([-\d.]+)", gl)
+                zm = _re.search(r"Z([-\d.]+)", gl)
 
                 nx = float(xm.group(1)) if xm else cur_x
                 ny = float(ym.group(1)) if ym else cur_y
                 nz = float(zm.group(1)) if zm else cur_z
 
-                dist = _math.sqrt((nx - cur_x)**2 + (ny - cur_y)**2 + (nz - cur_z)**2)
+                dist = _math.sqrt((nx - cur_x) ** 2 + (ny - cur_y) ** 2 + (nz - cur_z) ** 2)
                 if dist > 0.001 and cur_f > 0:
                     t += dist / (cur_f / 60.0)  # F is mm/min → mm/s
 
@@ -180,8 +180,8 @@ def build_timeline_and_interpolate(track, tool_changes, m73_points, total_lines,
             m400_total = 0.0
             for raw in gcode_lines:
                 gl = raw.strip()
-                ms = _re.match(r'^M400\s+S([\d.]+)', gl)
-                mp = _re.match(r'^M400\s+P([\d.]+)', gl)
+                ms = _re.match(r"^M400\s+S([\d.]+)", gl)
+                mp = _re.match(r"^M400\s+P([\d.]+)", gl)
                 if ms:
                     m400_total += float(ms.group(1))
                 elif mp:
@@ -199,7 +199,7 @@ def build_timeline_and_interpolate(track, tool_changes, m73_points, total_lines,
                 m400_lines = set()
                 for i, raw in enumerate(gcode_lines):
                     gl = raw.strip()
-                    if _re.match(r'^M400\s+[SP]', gl):
+                    if _re.match(r"^M400\s+[SP]", gl):
                         m400_lines.add(i + 1)  # 1-indexed
 
                 prev = 0.0
@@ -271,16 +271,16 @@ def build_timeline_and_interpolate(track, tool_changes, m73_points, total_lines,
             if rs <= l <= re_:
                 return True
         return False
-    
+
     for k in range(len(timeline) - 1):
         line1, time1 = timeline[k]
         line2, time2 = timeline[k + 1]
-        
+
         dT = time2 - time1
         dL = line2 - line1
         if dL <= 0:
             continue
-            
+
         weights = []
         total_w = 0.0
         for l in range(line1, line2 + 1):
@@ -290,11 +290,11 @@ def build_timeline_and_interpolate(track, tool_changes, m73_points, total_lines,
                 w += m400_weights[l] * 50.0
             weights.append((l, w))
             total_w += w
-            
+
         current_t = time1
         if total_w == 0:
             total_w = 1.0
-            
+
         for l, w in weights:
             line_to_time[l] = current_t
             current_t += (w / total_w) * dT
@@ -303,7 +303,7 @@ def build_timeline_and_interpolate(track, tool_changes, m73_points, total_lines,
         l_round = int(round(line))
         if l_round in line_to_time:
             return line_to_time[l_round]
-            
+
         if line <= timeline[0][0]:
             return timeline[0][1]
         if line >= timeline[-1][0]:
@@ -341,14 +341,14 @@ def parse_file_data(filepath):
             end_gcode_line = total_lines
             raw_gcode_lines = None
             for name in z.namelist():
-                if name.endswith('.gcode'):
-                    gcode_text = z.read(name).decode('utf-8', errors='replace')
-                    gcode_lines = gcode_text.split('\n')
+                if name.endswith(".gcode"):
+                    gcode_text = z.read(name).decode("utf-8", errors="replace")
+                    gcode_lines = gcode_text.split("\n")
                     for i in range(len(gcode_lines) - 1, -1, -1):
                         gl = gcode_lines[i]
                         line_num = i + 1
-                        if ';' in gl and '=' not in gl:
-                            if 'MACHINE_END_GCODE_START' in gl or 'filament end gcode' in gl or 'machine: H2C end' in gl:
+                        if ";" in gl and "=" not in gl:
+                            if "MACHINE_END_GCODE_START" in gl or "filament end gcode" in gl or "machine: H2C end" in gl:
                                 end_gcode_line = line_num
                                 break
                     raw_gcode_lines = gcode_lines
@@ -363,51 +363,52 @@ def parse_file_data(filepath):
             toolchange_zones_raw = []  # list of (start_line, end_line)
             m400_weights = {}
             for name in z.namelist():
-                if name.endswith('.gcode'):
-                    gcode_text = z.read(name).decode('utf-8', errors='replace')
-                    gcode_lines = gcode_text.split('\n')
+                if name.endswith(".gcode"):
+                    gcode_text = z.read(name).decode("utf-8", errors="replace")
+                    gcode_lines = gcode_text.split("\n")
                     nc_start = None
                     wipe_start = None
                     tc_block_start = None
                     for i, gl in enumerate(gcode_lines):
                         line_num = i + 1
                         # Parse M400 delay commands
-                        if 'M400' in gl:
+                        if "M400" in gl:
                             import re
-                            m_s = re.search(r'M400\s+S(\d+)', gl)
+
+                            m_s = re.search(r"M400\s+S(\d+)", gl)
                             if m_s:
                                 m400_weights[line_num] = float(m_s.group(1))
                             else:
-                                m_p = re.search(r'M400\s+P(\d+)', gl)
+                                m_p = re.search(r"M400\s+P(\d+)", gl)
                                 if m_p:
                                     m400_weights[line_num] = float(m_p.group(1)) * 0.001
                         # Match both Orca and BBS toolchange start comments
-                        if 'CP TOOLCHANGE START' in gl:
+                        if "CP TOOLCHANGE START" in gl:
                             tc_block_start = line_num
-                        elif 'CP TOOLCHANGE END' in gl:
+                        elif "CP TOOLCHANGE END" in gl:
                             if tc_block_start is not None:
                                 toolchange_zones_raw.append((tc_block_start, line_num))
                                 tc_block_start = None
 
                         # Match BBS (; NOZZLE_CHANGE_START) and Orca (; Nozzle change start/end)
-                        if 'NOZZLE_CHANGE_START' in gl or 'Nozzle change start' in gl:
+                        if "NOZZLE_CHANGE_START" in gl or "Nozzle change start" in gl:
                             nc_start = line_num
-                        elif 'NOZZLE_CHANGE_END' in gl or 'Nozzle change end' in gl:
+                        elif "NOZZLE_CHANGE_END" in gl or "Nozzle change end" in gl:
                             if nc_start is not None:
                                 tc_zones_raw.append((nc_start, line_num))
                                 nc_start = None
 
                         # Fallback: detect M632 M N / M633 as carousel nozzle change zones
                         # (Orca doesn't always emit ; Nozzle change start/end around M632/M633)
-                        if gl.startswith('M632') and ' M ' in gl and nc_start is None:
+                        if gl.startswith("M632") and " M " in gl and nc_start is None:
                             nc_start = line_num
-                        elif gl.startswith('M633') and nc_start is not None:
+                        elif gl.startswith("M633") and nc_start is not None:
                             tc_zones_raw.append((nc_start, line_num))
                             nc_start = None
                         # Match both Orca (; CP TOOLCHANGE WIPE) and BBS (; CP_TOOLCHANGE_WIPE)
-                        elif 'CP TOOLCHANGE WIPE' in gl or 'CP_TOOLCHANGE_WIPE' in gl:
+                        elif "CP TOOLCHANGE WIPE" in gl or "CP_TOOLCHANGE_WIPE" in gl:
                             wipe_start = line_num
-                        elif '; CP TOOLCHANGE END' in gl:
+                        elif "; CP TOOLCHANGE END" in gl:
                             if wipe_start is not None:
                                 wipe_zones_raw.append((wipe_start, line_num))
                                 wipe_start = None
@@ -430,45 +431,52 @@ def parse_file_data(filepath):
                     if t_val < 60000:
                         current_tool = t_val
 
-            track.append({
-                "line": line,
-                "active": current_tool,
-                "t0": t0,
-                "t1": t1,
-                "desc": desc,
-                "in_m620": in_m620_block,
-                "printing_started": printing_started
-            })
+            track.append(
+                {
+                    "line": line,
+                    "active": current_tool,
+                    "t0": t0,
+                    "t1": t1,
+                    "desc": desc,
+                    "in_m620": in_m620_block,
+                    "printing_started": printing_started,
+                }
+            )
             if desc.startswith("T") and "Active Filament" in desc:
                 parts = desc.split()
                 t_name = parts[0]
                 t_idx = -1
                 if t_name[1:].isdigit():
                     t_idx = int(t_name[1:])
-                tool_changes.append({
-                    "line": line,
-                    "name": t_name,
-                    "idx": t_idx,
-                    "desc": desc,
-                })
+                tool_changes.append(
+                    {
+                        "line": line,
+                        "name": t_name,
+                        "idx": t_idx,
+                        "desc": desc,
+                    }
+                )
 
-        total_duration, get_time = build_timeline_and_interpolate(track, tool_changes, m73_points, total_lines, m400_weights,
-                                                                    gcode_lines=raw_gcode_lines)
+        total_duration, get_time = build_timeline_and_interpolate(
+            track, tool_changes, m73_points, total_lines, m400_weights, gcode_lines=raw_gcode_lines
+        )
         end_gcode_time = get_time(end_gcode_line)
-        
+
         # Convert preheat lines to time (seconds)
         preheats = []
         for ev in raw_preheats:
             if ev["preheat_line"] is not None and ev["tc_line"] is not None:
                 start_t = get_time(ev["preheat_line"])
                 end_t = get_time(ev["tc_line"])
-                preheats.append({
-                    "start_time": start_t,
-                    "end_time": end_t,
-                    "heater": ev["target_ext"],  # 0 or 1
-                    "target_temp": ev["preheat_temp"],
-                    "nozzle_num": ev["nozzle_num"]
-                })
+                preheats.append(
+                    {
+                        "start_time": start_t,
+                        "end_time": end_t,
+                        "heater": ev["target_ext"],  # 0 or 1
+                        "target_temp": ev["preheat_temp"],
+                        "nozzle_num": ev["nozzle_num"],
+                    }
+                )
 
         # Convert precool (cooldown) lines to time (seconds)
         # Precool = M104 S<low_temp> on the DEPARTING nozzle before tool change
@@ -485,16 +493,18 @@ def parse_file_data(filepath):
                     continue
                 # source_ext = the extruder that is LEAVING (opposite of target_ext)
                 source_heater = 1 - ev["target_ext"] if ev["target_ext"] in (0, 1) else 0
-                precools.append({
-                    "start_time": start_t,
-                    "end_time": end_t,
-                    "heater": source_heater,
-                    "target_temp": ev["cooldown_temp"],
-                    "nozzle_num": ev.get("nozzle_num", -1)
-                })
-        
+                precools.append(
+                    {
+                        "start_time": start_t,
+                        "end_time": end_t,
+                        "heater": source_heater,
+                        "target_temp": ev["cooldown_temp"],
+                        "nozzle_num": ev.get("nozzle_num", -1),
+                    }
+                )
+
         heater_to_ext = determine_heater_to_extruder(track, extruder_map)
-        
+
         nozzle_map = {}
         for fid, ext_id in extruder_map.items():
             nozzle_map[fid] = heater_to_ext.get(ext_id, 0)
@@ -520,42 +530,43 @@ def parse_file_data(filepath):
             all_sub_zones.append({"type": "nc", "start_line": s, "end_line": e})
         for s, e in wipe_zones_raw:
             all_sub_zones.append({"type": "wipe", "start_line": s, "end_line": e})
-            
+
         all_sub_zones.sort(key=lambda z: z["start_line"])
-        
+
         tc_zones = []
         wipe_zones = []
         prev_end_time = -1.0
         min_dur = 8.0
-        
+
         for zone in all_sub_zones:
             s_line = zone["start_line"]
             e_line = zone["end_line"]
             t_start = get_time(s_line)
             t_end = get_time(e_line)
-            
+
             actual_dur = t_end - t_start
             dur = actual_dur
             if actual_dur < min_dur:
                 dur = max(min_dur, (e_line - s_line) * 0.15)
-                
+
             if t_start < prev_end_time:
                 t_start = prev_end_time
-                
+
             t_end = t_start + dur
             prev_end_time = t_end
-            
+
             formatted_zone = {"start_time": t_start, "end_time": t_end}
             if zone["type"] == "nc":
                 tc_zones.append(formatted_zone)
             else:
                 wipe_zones.append(formatted_zone)
-                
+
         toolchange_zones = [zone_to_time(s, e) for s, e in toolchange_zones_raw]
 
-
-        slicer_name = "OrcaSlicer" if "orca" in os.path.basename(filepath).lower() else (
-            "BambuStudio" if "bbl" in os.path.basename(filepath).lower() else "Slicer"
+        slicer_name = (
+            "OrcaSlicer"
+            if "orca" in os.path.basename(filepath).lower()
+            else ("BambuStudio" if "bbl" in os.path.basename(filepath).lower() else "Slicer")
         )
 
         print(f"  Extruder groups: {extruder_groups}")
@@ -563,7 +574,7 @@ def parse_file_data(filepath):
         for fid, heater in sorted(nozzle_map.items()):
             ext_id = extruder_map.get(fid, "?")
             fil_info = filaments.get(fid, {})
-            print(f"    T{fid} ({fil_info.get('type','?')} {fil_info.get('color','?')}) → Extruder {ext_id} → Heater {heater}")
+            print(f"    T{fid} ({fil_info.get('type', '?')} {fil_info.get('color', '?')}) → Extruder {ext_id} → Heater {heater}")
 
         cooldown_count = sum(1 for ev in raw_preheats if ev.get("cooldown_temp") is not None)
 
@@ -589,6 +600,7 @@ def parse_file_data(filepath):
         }
     except Exception as e:
         import traceback
+
         print(f"Error parsing {filepath}: {e}")
         traceback.print_exc()
         return None

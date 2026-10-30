@@ -126,8 +126,7 @@ SCRIPTS_DIR = os.path.dirname(os.path.abspath(__file__))
 PROFILES_DIR = os.path.normpath(os.path.join(SCRIPTS_DIR, "..", "resources", "profiles"))
 # The single source of truth for the map path; update_bambu_filament_ids.py
 # imports this rather than recomputing it.
-BAMBU_MAP_PATH = os.path.normpath(
-    os.path.join(SCRIPTS_DIR, "..", "resources", "printers", "bambu_filament_ids.json"))
+BAMBU_MAP_PATH = os.path.normpath(os.path.join(SCRIPTS_DIR, "..", "resources", "printers", "bambu_filament_ids.json"))
 
 OFL = "OrcaFilamentLibrary"
 # The validator's data dir, created under resources/profiles by a local run;
@@ -161,26 +160,63 @@ NON_PROFILE_FILES = {
 # checks parity. Used by normalize and check. Active options and
 # legacy aliases that the loader migrates do not belong here.
 OBSOLETE_KEYS = {
-    "acceleration", "scale", "rotate", "duplicate", "duplicate_grid",
-    "bed_size", "print_center", "g0", "wipe_tower_per_color_wipe",
-    "support_sharp_tails", "support_remove_small_overhangs", "support_with_sheath",
-    "tree_support_collision_resolution", "tree_support_with_infill",
-    "max_volumetric_speed", "max_print_speed", "support_closing_radius",
-    "remove_freq_sweep", "remove_bed_leveling", "remove_extrusion_calibration",
-    "support_transition_line_width", "support_transition_speed", "bed_temperature",
-    "bed_temperature_initial_layer", "can_switch_nozzle_type", "can_add_auxiliary_fan",
-    "extra_flush_volume", "spaghetti_detector", "adaptive_layer_height",
-    "z_hop_type", "z_lift_type", "bed_temperature_difference", "long_retraction_when_cut",
-    "retraction_distance_when_cut", "internal_bridge_support_thickness",
-    "top_area_threshold", "reduce_wall_solid_infill",
-    "filament_load_time", "filament_unload_time", "smooth_coefficient",
-    "overhang_totally_speed", "silent_mode", "overhang_speed_classic",
+    "acceleration",
+    "scale",
+    "rotate",
+    "duplicate",
+    "duplicate_grid",
+    "bed_size",
+    "print_center",
+    "g0",
+    "wipe_tower_per_color_wipe",
+    "support_sharp_tails",
+    "support_remove_small_overhangs",
+    "support_with_sheath",
+    "tree_support_collision_resolution",
+    "tree_support_with_infill",
+    "max_volumetric_speed",
+    "max_print_speed",
+    "support_closing_radius",
+    "remove_freq_sweep",
+    "remove_bed_leveling",
+    "remove_extrusion_calibration",
+    "support_transition_line_width",
+    "support_transition_speed",
+    "bed_temperature",
+    "bed_temperature_initial_layer",
+    "can_switch_nozzle_type",
+    "can_add_auxiliary_fan",
+    "extra_flush_volume",
+    "spaghetti_detector",
+    "adaptive_layer_height",
+    "z_hop_type",
+    "z_lift_type",
+    "bed_temperature_difference",
+    "long_retraction_when_cut",
+    "retraction_distance_when_cut",
+    "internal_bridge_support_thickness",
+    "top_area_threshold",
+    "reduce_wall_solid_infill",
+    "filament_load_time",
+    "filament_unload_time",
+    "smooth_coefficient",
+    "overhang_totally_speed",
+    "silent_mode",
+    "overhang_speed_classic",
     "anisotropic_surfaces",
     # Belt printer options retired before the feature shipped (#16236).
-    "belt_slice_rotation_global", "preslice_remap_x", "preslice_remap_y", "preslice_remap_z",
-    "preslice_remap_global", "belt_support_z_offset_mode", "first_layer_plane",
-    "first_layer_plane_offset", "belt_preslice_global", "gcode_back_transform",
-    "belt_support_floor_mode", "first_layer_plane_thickness",
+    "belt_slice_rotation_global",
+    "preslice_remap_x",
+    "preslice_remap_y",
+    "preslice_remap_z",
+    "preslice_remap_global",
+    "belt_support_z_offset_mode",
+    "first_layer_plane",
+    "first_layer_plane_offset",
+    "belt_preslice_global",
+    "gcode_back_transform",
+    "belt_support_floor_mode",
+    "first_layer_plane_thickness",
 }
 
 # Keys renamed at some point, whose old and new spellings must never co-exist:
@@ -195,12 +231,11 @@ VECTOR_KEYS = {
     "filament_type",
 }
 
-PRINT_CONFIG_CPP = os.path.normpath(
-    os.path.join(SCRIPTS_DIR, "..", "src", "libslic3r", "PrintConfig.cpp"))
+PRINT_CONFIG_CPP = os.path.normpath(os.path.join(SCRIPTS_DIR, "..", "src", "libslic3r", "PrintConfig.cpp"))
 TAB_CPP = os.path.normpath(os.path.join(SCRIPTS_DIR, "..", "src", "slic3r", "GUI", "Tab.cpp"))
 
 
-@functools.lru_cache(maxsize=None)
+@functools.cache
 def _variant_scheme():
     """Per config preset type: the key listing the preset's own variants, and the
     stride of every key sized by it.
@@ -215,8 +250,7 @@ def _variant_scheme():
         source = f.read()
 
     def members(name):
-        match = re.search(r"std::set<std::string>\s+" + name + r"\s*=\s*\{(.*?)\};",
-                          source, re.DOTALL)
+        match = re.search(r"std::set<std::string>\s+" + name + r"\s*=\s*\{(.*?)\};", source, re.DOTALL)
         if match is None:
             raise RuntimeError(f"{PRINT_CONFIG_CPP} no longer defines {name}")
         # An initializer can carry a commented-out entry (filament_extruder_id).
@@ -224,17 +258,19 @@ def _variant_scheme():
         return sorted(set(re.findall(r'"([^"\n]+)"', body)))
 
     return {
-        "machine": ("printer_extruder_variant", {
-            **dict.fromkeys(members("printer_options_with_variant_1"), 1),
-            **dict.fromkeys(members("printer_options_with_variant_2"), 2)}),
-        "process": ("print_extruder_variant",
-                    dict.fromkeys(members("print_options_with_variant"), 1)),
-        "filament": ("filament_extruder_variant",
-                     dict.fromkeys(members("filament_options_with_variant"), 1)),
+        "machine": (
+            "printer_extruder_variant",
+            {
+                **dict.fromkeys(members("printer_options_with_variant_1"), 1),
+                **dict.fromkeys(members("printer_options_with_variant_2"), 2),
+            },
+        ),
+        "process": ("print_extruder_variant", dict.fromkeys(members("print_options_with_variant"), 1)),
+        "filament": ("filament_extruder_variant", dict.fromkeys(members("filament_options_with_variant"), 1)),
     }
 
 
-@functools.lru_cache(maxsize=None)
+@functools.cache
 def _variant_names():
     """The parts a variant string is built from, read from PrintConfig.cpp.
 
@@ -251,8 +287,7 @@ def _variant_names():
         source = f.read()
 
     def enum_map(name):
-        match = re.search(r"t_config_enum_values\s+" + name + r"\s*=\s*\{(.*?)\};",
-                          source, re.DOTALL)
+        match = re.search(r"t_config_enum_values\s+" + name + r"\s*=\s*\{(.*?)\};", source, re.DOTALL)
         if match is None:
             raise RuntimeError(f"{PRINT_CONFIG_CPP} no longer defines {name}")
         body = re.sub(r"//[^\n]*|/\*.*?\*/", "", match.group(1), flags=re.DOTALL)
@@ -264,16 +299,15 @@ def _variant_names():
         An absent branch means the loader rewrites nothing, which is a defined answer
         rather than a broken parse: every legacy name is then reported as unknown.
         """
-        match = re.search(r'opt_key == "' + anchor + r'"\s*\)\s*\{(.*?)\}',
-                          source, re.DOTALL)
-        return ({} if match is None else
-                dict(re.findall(r'ReplaceString\(value,\s*"([^"]+)",\s*"([^"]+)"\)',
-                                match.group(1))))
+        match = re.search(r'opt_key == "' + anchor + r'"\s*\)\s*\{(.*?)\}', source, re.DOTALL)
+        return {} if match is None else dict(re.findall(r'ReplaceString\(value,\s*"([^"]+)",\s*"([^"]+)"\)', match.group(1)))
 
-    return (enum_map("s_keys_map_ExtruderType"),
-            enum_map("s_keys_map_NozzleVolumeType") - RUNTIME_VOLUME_TYPES,
-            rewrites("extruder_variant_list"),
-            rewrites("extruder_type"))
+    return (
+        enum_map("s_keys_map_ExtruderType"),
+        enum_map("s_keys_map_NozzleVolumeType") - RUNTIME_VOLUME_TYPES,
+        rewrites("extruder_variant_list"),
+        rewrites("extruder_type"),
+    )
 
 
 # What a preset that writes no variant layout takes: the default extruder_type and
@@ -307,26 +341,29 @@ NORMALIZE_HINT = 'try "python scripts/orca_profile_tool.py normalize" to fix com
 # a maintainer has to read.
 REMEDY_HINTS = {
     "unindexed": 'unreferenced file(s) above: delete them, or run "python scripts/'
-                 'orca_profile_tool.py update-index" to add them to their <vendor>.json',
+    'orca_profile_tool.py update-index" to add them to their <vendor>.json',
     "unindexable": 'unreferenced file(s) above declare no profile type: run "python '
-                   'scripts/orca_profile_tool.py normalize" to write one so '
-                   "update-index can place them, or delete them",
+    'scripts/orca_profile_tool.py normalize" to write one so '
+    "update-index can place them, or delete them",
     "unnormalized": 'profile file(s) above are not what "python scripts/'
-                    'orca_profile_tool.py normalize" writes: run it and commit the result',
+    'orca_profile_tool.py normalize" writes: run it and commit the result',
     "stale_index": 'vendor index(es) above are not what "python scripts/'
-                   'orca_profile_tool.py update-index" writes: run it and commit the '
-                   "result",
+    'orca_profile_tool.py update-index" writes: run it and commit the '
+    "result",
 }
 
 
 def print_error(msg, file=None):
     print(f"\033[91m[ERROR]\033[0m {msg}", file=file)  # Red
 
+
 def print_warning(msg, file=None):
     print(f"\033[93m[WARNING]\033[0m {msg}", file=file)  # Yellow
 
+
 def print_info(msg):
     print(f"\033[94m[INFO]\033[0m {msg}")  # Blue
+
 
 def print_success(msg):
     print(f"\033[92m[SUCCESS]\033[0m {msg}")  # Green
@@ -345,6 +382,7 @@ def _utf8_console():
 # ---------------------------------------------------------------------------
 # Minting
 # ---------------------------------------------------------------------------
+
 
 def _base62_tail(n, length):
     """The low `length` base62 digits of n, most-significant first.
@@ -395,6 +433,7 @@ def generate_filament_id(filament_vendor, filament_type, filament_name):
 # Tree loading + loader-faithful effective-id resolution
 # ---------------------------------------------------------------------------
 
+
 class DuplicateKeyError(ValueError):
     """A profile declares one key twice; json would silently keep the last."""
 
@@ -415,9 +454,8 @@ def load_json(path, detect_duplicates=False):
     always had it use it, since switching it on everywhere would newly reject files
     the tree has always accepted, and switching it off would lose real coverage.
     """
-    with open(path, "r", encoding="utf-8-sig") as f:
-        return json.load(f, object_pairs_hook=_no_duplicates_hook if detect_duplicates
-                         else None)
+    with open(path, encoding="utf-8-sig") as f:
+        return json.load(f, object_pairs_hook=_no_duplicates_hook if detect_duplicates else None)
 
 
 def list_vendor_names(profiles_dir):
@@ -428,9 +466,9 @@ def list_vendor_names(profiles_dir):
     """
     profiles_dir = str(profiles_dir)
     return sorted(
-        os.path.splitext(f)[0] for f in os.listdir(profiles_dir)
-        if f.endswith(".json")
-        and os.path.isdir(os.path.join(profiles_dir, os.path.splitext(f)[0]))
+        os.path.splitext(f)[0]
+        for f in os.listdir(profiles_dir)
+        if f.endswith(".json") and os.path.isdir(os.path.join(profiles_dir, os.path.splitext(f)[0]))
     )
 
 
@@ -444,8 +482,7 @@ def list_profile_dirs(profiles_dir):
     list_vendor_names above.)
     """
     profiles_dir = str(profiles_dir)
-    return sorted(d for d in os.listdir(profiles_dir)
-                  if os.path.isdir(os.path.join(profiles_dir, d)))
+    return sorted(d for d in os.listdir(profiles_dir) if os.path.isdir(os.path.join(profiles_dir, d)))
 
 
 def iter_profile_files(vendor_dir):
@@ -580,9 +617,11 @@ def resolve_filament_field(name, field, filaments, ofl_filaments, seen=None, in_
 
 def resolve_triple(name, filaments, ofl_filaments):
     """The preset's mint-key triple (filament_vendor, filament_type, filament name)."""
-    return (resolve_filament_field(name, "filament_vendor", filaments, ofl_filaments),
-            resolve_filament_field(name, "filament_type", filaments, ofl_filaments),
-            base_name(name))
+    return (
+        resolve_filament_field(name, "filament_vendor", filaments, ofl_filaments),
+        resolve_filament_field(name, "filament_type", filaments, ofl_filaments),
+        base_name(name),
+    )
 
 
 def analyze_tree(profiles_dir):
@@ -593,9 +632,7 @@ def analyze_tree(profiles_dir):
     """
     profiles_dir = str(profiles_dir)
     vendor_names = list_vendor_names(profiles_dir)
-    ofl_filaments, ofl_errors = (
-        load_vendor_filaments(profiles_dir, OFL) if OFL in vendor_names else ({}, [])
-    )
+    ofl_filaments, ofl_errors = load_vendor_filaments(profiles_dir, OFL) if OFL in vendor_names else ({}, [])
 
     vendors = {}
     read_errors = list(ofl_errors)
@@ -611,14 +648,14 @@ def analyze_tree(profiles_dir):
             rec["id_source"] = src
         vendors[vendor] = filaments
 
-    vendor_ids = {}             # vendor -> set of ids occurring there (declared or effective)
-    declared_ids = {}           # vendor -> set of ids DECLARED in that vendor's own files
-    missing_effective = []      # (vendor, name, file) instantiated presets resolving no id
-    inherited = []              # (vendor, rec, eff, triple) instantiated presets inheriting an OF id
-    triples = {}                # fid -> set of triples of its declarers
-    declarer_triples = []       # (vendor, rec, fid, triple) per declarer
-    filament_triples = {}       # (vendor, filament_name) -> {triple: [declarers]}
-    mints = {}                  # minted id -> triples minting it (declarers + instantiated)
+    vendor_ids = {}  # vendor -> set of ids occurring there (declared or effective)
+    declared_ids = {}  # vendor -> set of ids DECLARED in that vendor's own files
+    missing_effective = []  # (vendor, name, file) instantiated presets resolving no id
+    inherited = []  # (vendor, rec, eff, triple) instantiated presets inheriting an OF id
+    triples = {}  # fid -> set of triples of its declarers
+    declarer_triples = []  # (vendor, rec, fid, triple) per declarer
+    filament_triples = {}  # (vendor, filament_name) -> {triple: [declarers]}
+    mints = {}  # minted id -> triples minting it (declarers + instantiated)
 
     for vendor, filaments in vendors.items():
         occurring = vendor_ids.setdefault(vendor, set())
@@ -633,9 +670,7 @@ def analyze_tree(profiles_dir):
                 declared_ids.setdefault(vendor, set()).add(fid)
                 declarer_triples.append((vendor, rec, fid, triple))
                 triples.setdefault(fid, set()).add(triple)
-                filament_triples.setdefault(
-                    (vendor, base_name(rec["name"])), {}).setdefault(
-                    triple, []).append(rec["name"])
+                filament_triples.setdefault((vendor, base_name(rec["name"])), {}).setdefault(triple, []).append(rec["name"])
             if not rec["instantiation"]:
                 continue
             eff = rec.get("eff_filament_id")
@@ -678,6 +713,7 @@ def analyze_tree(profiles_dir):
 # filament_id validation
 # ---------------------------------------------------------------------------
 
+
 def check_filament_ids(profiles_dir=PROFILES_DIR, map_path=BAMBU_MAP_PATH):
     """Validate filament_id state across every vendor. Returns the error count.
 
@@ -712,9 +748,7 @@ def check_filament_ids(profiles_dir=PROFILES_DIR, map_path=BAMBU_MAP_PATH):
         for fid in sorted(analysis["vendor_ids"][vendor]):
             if OF_ID_RE.match(fid):
                 continue
-            print_error(
-                f'filament_id "{fid}" ({vendor}) is not a minted "OF" id; new '
-                f'filament ids must come from "{GENERATE_CMD}"')
+            print_error(f'filament_id "{fid}" ({vendor}) is not a minted "OF" id; new filament ids must come from "{GENERATE_CMD}"')
             errors += 1
 
     # -- 2. identity: the id is a function of the triple alone ---------------
@@ -724,8 +758,7 @@ def check_filament_ids(profiles_dir=PROFILES_DIR, map_path=BAMBU_MAP_PATH):
     # presets of one product that would be AMS-ambiguous on a printer are fixed
     # in the profiles, by making their compatible_printers disjoint or by
     # retiring the redundant one.
-    for vendor, rec, fid, triple in sorted(
-            analysis["declarer_triples"], key=lambda x: (x[0], x[1]["file"])):
+    for vendor, rec, fid, triple in sorted(analysis["declarer_triples"], key=lambda x: (x[0], x[1]["file"])):
         want = generate_filament_id(*triple)
         if not OF_ID_RE.match(fid) or fid == want:
             continue  # a non-OF id is check 1's error
@@ -733,14 +766,14 @@ def check_filament_ids(profiles_dir=PROFILES_DIR, map_path=BAMBU_MAP_PATH):
             f'filament_id "{fid}" declared by "{rec["name"]}" ({rec["file"]}) does '
             f'not match the mint of its triple "{"/".join(triple)}": expected '
             f'"{want}"; paste the expected id, or fix the triple and run '
-            f'"{GENERATE_CMD} --vendor {vendor}" (preview with --dry-run)')
+            f'"{GENERATE_CMD} --vendor {vendor}" (preview with --dry-run)'
+        )
         errors += 1
     # (2b) An inherited id is held to the same single value, and every preset
     # missing it is listed — a variant under a wrong root as much as a preset
     # riding another product's root. Nothing is folded into the declarer's
     # error: the report names each preset whose id is wrong.
-    for vendor, rec, eff, triple in sorted(
-            analysis["inherited"], key=lambda x: (x[0], x[1]["file"])):
+    for vendor, rec, eff, triple in sorted(analysis["inherited"], key=lambda x: (x[0], x[1]["file"])):
         want = generate_filament_id(*triple)
         if eff == want:
             continue
@@ -748,7 +781,8 @@ def check_filament_ids(profiles_dir=PROFILES_DIR, map_path=BAMBU_MAP_PATH):
             f'preset "{rec["name"]}" ({rec["file"]}) inherits filament_id "{eff}" but '
             f'its own triple "{"/".join(triple)}" mints "{want}"; '
             f"a preset carries the id of its own product: inherit a preset of the "
-            f"same filament, or declare its own key")
+            f"same filament, or declare its own key"
+        )
         errors += 1
     ofl_map = analysis["vendors"].get(OFL, {})
     for vendor, name, file in analysis["missing_effective"]:
@@ -758,49 +792,47 @@ def check_filament_ids(profiles_dir=PROFILES_DIR, map_path=BAMBU_MAP_PATH):
             f'instantiated filament "{name}" ({file}) resolves no filament_id anywhere '
             f"in its inherits chain — this is a hard load error in the C++ loader; "
             f'run "{GENERATE_CMD}" (expected id for filament '
-            f'"{vendor}/{base_name(name)}": "{expected}")')
+            f'"{vendor}/{base_name(name)}": "{expected}")'
+        )
         errors += 1
     # (2d) The mint is injective over the tree's products, or two of them are
     # indistinguishable to every device that matches on the id.
     for fid, ts in sorted(analysis["collisions"].items()):
         print_error(
             f'filament_id "{fid}" is the mint of {len(ts)} different products '
-            f'({"; ".join("/".join(t) for t in ts)}): a base62 collision; rename one '
-            f"of them so their triples differ")
+            f"({'; '.join('/'.join(t) for t in ts)}): a base62 collision; rename one "
+            f"of them so their triples differ"
+        )
         errors += 1
 
     # -- 3. triple integrity ---------------------------------------------------
-    for vendor, rec, fid, triple in sorted(
-            analysis["declarer_triples"], key=lambda x: (x[0], x[1]["file"])):
+    for vendor, rec, fid, triple in sorted(analysis["declarer_triples"], key=lambda x: (x[0], x[1]["file"])):
         if triple[0] and triple[1]:
             continue
-        missing = " and ".join(
-            k for k, v in (("filament_vendor", triple[0]),
-                           ("filament_type", triple[1])) if not v)
+        missing = " and ".join(k for k, v in (("filament_vendor", triple[0]), ("filament_type", triple[1])) if not v)
         print_error(
             f'preset "{rec["name"]}" ({rec["file"]}) declares filament_id "{fid}" but '
             f"resolves empty {missing}; the mint key needs both (generic materials "
-            f'use filament_vendor "Generic")')
+            f'use filament_vendor "Generic")'
+        )
         errors += 1
     for (vendor, filament_name), tmap in sorted(analysis["filament_triples"].items()):
         if len(tmap) < 2:
             continue
-        detail = "; ".join(
-            f'"{"/".join(t)}" ({", ".join(sorted(names))})'
-            for t, names in sorted(tmap.items()))
+        detail = "; ".join(f'"{"/".join(t)}" ({", ".join(sorted(names))})' for t, names in sorted(tmap.items()))
         print_error(
             f'filament "{vendor}/{filament_name}" declarers resolve divergent triples: '
             f"{detail}; declarers of one filament must agree on "
-            f"(filament_vendor, filament_type)")
+            f"(filament_vendor, filament_type)"
+        )
         errors += 1
     for filament_name, per_vendor in analysis["cross_bundle_triples"]:
-        detail = "; ".join(
-            f'{v}: {", ".join("/".join(t) for t in ts)}'
-            for v, ts in sorted(per_vendor.items()))
+        detail = "; ".join(f"{v}: {', '.join('/'.join(t) for t in ts)}" for v, ts in sorted(per_vendor.items()))
         print_warning(
             f'filament name "{filament_name}" resolves different triples across bundles '
             f"({detail}); bundles of one product converge on one id only once "
-            f"their triples agree")
+            f"their triples agree"
+        )
 
     # -- 4. Bambu catalog map --------------------------------------------------
     try:
@@ -820,26 +852,24 @@ def check_filament_ids(profiles_dir=PROFILES_DIR, map_path=BAMBU_MAP_PATH):
         # translation silently degrade to identity (BBLPrinterAgent logs nothing for it),
         # and it is what a regeneration against the wrong --bambustudio-dir writes.
         if not isinstance(rows, dict) or not rows:
-            print_error(f'Bambu catalog map {map_path} declares no "filaments" rows; '
-                        f"{BAMBU_MAP_HINT}")
+            print_error(f'Bambu catalog map {map_path} declares no "filaments" rows; {BAMBU_MAP_HINT}')
             errors += 1
             rows = {}
         bambu_id_owners = {}
         for fid, row in sorted(rows.items()):
             if not OF_ID_RE.match(fid):
-                print_error(f'Bambu catalog map key "{fid}" is not a minted "OF" id; '
-                           f"{BAMBU_MAP_HINT}")
+                print_error(f'Bambu catalog map key "{fid}" is not a minted "OF" id; {BAMBU_MAP_HINT}')
                 errors += 1
             bambu_id = row.get("bambu_id")
             if not bambu_id:
                 # An empty id would map the empty string to a real filament at runtime.
-                print_error(f'Bambu catalog map row "{fid}" declares no "bambu_id"; '
-                            f"{BAMBU_MAP_HINT}")
+                print_error(f'Bambu catalog map row "{fid}" declares no "bambu_id"; {BAMBU_MAP_HINT}')
                 errors += 1
             elif bambu_id in bambu_id_owners:
                 print_error(
                     f'Bambu catalog map: Bambu id "{bambu_id}" is mapped by both '
-                    f'"{bambu_id_owners[bambu_id]}" and "{fid}"; {BAMBU_MAP_HINT}')
+                    f'"{bambu_id_owners[bambu_id]}" and "{fid}"; {BAMBU_MAP_HINT}'
+                )
                 errors += 1
             else:
                 bambu_id_owners[bambu_id] = fid
@@ -851,7 +881,8 @@ def check_filament_ids(profiles_dir=PROFILES_DIR, map_path=BAMBU_MAP_PATH):
                 print_error(
                     f'Bambu catalog map row "{fid}" claims triple "{"/".join(row_triple)}" '
                     f'but the tree declares "{"; ".join("/".join(t) for t in claimed)}" for '
-                    f"that id; {BAMBU_MAP_HINT}")
+                    f"that id; {BAMBU_MAP_HINT}"
+                )
                 errors += 1
 
     return errors
@@ -860,6 +891,7 @@ def check_filament_ids(profiles_dir=PROFILES_DIR, map_path=BAMBU_MAP_PATH):
 # ---------------------------------------------------------------------------
 # setting_id validation
 # ---------------------------------------------------------------------------
+
 
 def check_setting_id_uniqueness(profiles_dir):
     """Validate setting_id across every vendor. Returns the error count.
@@ -894,23 +926,20 @@ def check_setting_id_uniqueness(profiles_dir):
             # Rule 5: catch the misspelled "settings_id" key.
             if "settings_id" in data:
                 errors += 1
-                print_error(
-                    f'profile {rel} uses the misspelled key "settings_id" '
-                    f'(should be "setting_id"); run {SETTING_ID_CMD}')
+                print_error(f'profile {rel} uses the misspelled key "settings_id" (should be "setting_id"); run {SETTING_ID_CMD}')
             sid = data.get("setting_id")
             if data.get("instantiation") != "true":
                 # Rule 3: base/template profiles must not carry a setting_id.
                 if sid:
                     errors += 1
                     print_error(
-                        f'base profile {rel} (instantiation != "true") must not have a '
-                        f'setting_id ("{sid}"); run {SETTING_ID_CMD}')
+                        f'base profile {rel} (instantiation != "true") must not have a setting_id ("{sid}"); run {SETTING_ID_CMD}'
+                    )
                 continue
             # Rule 1: every instantiated preset must have a setting_id.
             if not sid:
                 errors += 1
-                print_error(f"instantiated preset {rel} is missing a setting_id; "
-                            f"run {SETTING_ID_CMD}")
+                print_error(f"instantiated preset {rel} is missing a setting_id; run {SETTING_ID_CMD}")
                 continue
             # Rule 2: the stored id must match the deterministic rule.
             if not formula_exempt:
@@ -920,7 +949,8 @@ def check_setting_id_uniqueness(profiles_dir):
                     print_error(
                         f'setting_id "{sid}" in {rel} does not match the expected '
                         f'"{expected}" for {vendor}/{sub}/{data.get("name", "")}; '
-                        f"run {SETTING_ID_CMD}")
+                        f"run {SETTING_ID_CMD}"
+                    )
                     continue
             owners.setdefault(sid, []).append(rel)
 
@@ -930,8 +960,7 @@ def check_setting_id_uniqueness(profiles_dir):
         if len(locs) < 2:
             continue
         errors += 1
-        print_error(f'setting_id "{sid}" is shared by {len(locs)} files ({sorted(locs)}); '
-                    f"setting_id must be globally unique")
+        print_error(f'setting_id "{sid}" is shared by {len(locs)} files ({sorted(locs)}); setting_id must be globally unique')
     return errors
 
 
@@ -969,8 +998,7 @@ def check_machine_model_name_uniqueness(profiles_dir):
                 continue
             name = data.get("name")
             if name:
-                owners[name].append(
-                    os.path.relpath(path, profiles_dir).replace(os.sep, "/"))
+                owners[name].append(os.path.relpath(path, profiles_dir).replace(os.sep, "/"))
 
     for name, paths in sorted(owners.items()):
         if len(paths) < 2:
@@ -978,9 +1006,10 @@ def check_machine_model_name_uniqueness(profiles_dir):
         errors += 1
         print_error(
             f'machine_model name "{name}" is declared by {len(paths)} bundles '
-            f'({", ".join(sorted(paths))}); a machine model name is global, so the '
+            f"({', '.join(sorted(paths))}); a machine model name is global, so the "
             f"printer type resolves to whichever bundle is seen first and the Add "
-            f"Printer list shows it twice - rename or delete the duplicate")
+            f"Printer list shows it twice - rename or delete the duplicate"
+        )
     return errors
 
 
@@ -989,6 +1018,7 @@ def check_machine_model_name_uniqueness(profiles_dir):
 # ---------------------------------------------------------------------------
 # These walk one vendor bundle each and are what --vendor narrows. They use
 # pathlib where the originals did; the check driver converts at the boundary.
+
 
 def _vendor_json_files(vendor_path):
     """Every .json under a vendor bundle, deepest-last, in a stable order."""
@@ -1023,17 +1053,18 @@ def check_preset_name_uniqueness(profiles_dir, vendor):
             continue
         if not data.get("name"):
             continue  # a nameless profile is check_filament_compatible_printers'
-        claimed[(data["type"], data["name"])].append(
-            posixpath.normpath(os.path.relpath(path, vendor_dir).replace(os.sep, "/")))
+        claimed[(data["type"], data["name"])].append(posixpath.normpath(os.path.relpath(path, vendor_dir).replace(os.sep, "/")))
 
     for (profile_type, name), sub_paths in sorted(claimed.items()):
         if len(sub_paths) < 2:
             continue
         errors += 1
-        print_error(f"{vendor} has {len(sub_paths)} {profile_type} profiles named "
-                    f'"{name}" ({", ".join(sorted(sub_paths))}); a bundle holds one '
-                    f"profile per name, so the loader keeps whichever it reaches first "
-                    f"and silently drops the rest")
+        print_error(
+            f"{vendor} has {len(sub_paths)} {profile_type} profiles named "
+            f'"{name}" ({", ".join(sorted(sub_paths))}); a bundle holds one '
+            f"profile per name, so the loader keeps whichever it reaches first "
+            f"and silently drops the rest"
+        )
     return errors
 
 
@@ -1101,8 +1132,7 @@ def load_available_filament_profiles(profiles_dir, vendor):
         try:
             data = load_json(file_path)
         except (ValueError, OSError) as e:
-            print_error(f"Error loading filament profile "
-                        f"{file_path.relative_to(profiles_dir)}: {e}")
+            print_error(f"Error loading filament profile {file_path.relative_to(profiles_dir)}: {e}")
             continue
         if isinstance(data, dict) and "name" in data:
             profiles.add(data["name"])
@@ -1119,8 +1149,7 @@ def check_machine_default_materials(profiles_dir, vendor):
     if not machine_dir.exists():
         return 0, 0
 
-    available = (load_available_filament_profiles(profiles_dir, vendor)
-                 | load_available_filament_profiles(profiles_dir, OFL))
+    available = load_available_filament_profiles(profiles_dir, vendor) | load_available_filament_profiles(profiles_dir, OFL)
 
     for file_path in _vendor_json_files(machine_dir):
         rel = file_path.relative_to(profiles_dir)
@@ -1131,8 +1160,7 @@ def check_machine_default_materials(profiles_dir, vendor):
             error_count += 1
             continue
 
-        default_materials = data.get("default_materials") or data.get(
-            "default_filament_profile")
+        default_materials = data.get("default_materials") or data.get("default_filament_profile")
         if not default_materials:
             continue
         if isinstance(default_materials, list):
@@ -1175,8 +1203,7 @@ def check_name_consistency(profiles_dir, vendor):
             name_in_vendor = child.get("name")
             sub_path = child.get("sub_path")
             if not name_in_vendor or not sub_path:
-                print_error(f"{section} entry without a name/sub_path in {vendor}.json: "
-                            f"{child}")
+                print_error(f"{section} entry without a name/sub_path in {vendor}.json: {child}")
                 error_count += 1
                 continue
             sub_file = vendor_dir / sub_path
@@ -1194,9 +1221,11 @@ def check_name_consistency(profiles_dir, vendor):
             name_in_sub = sub_data.get("name")
             if name_in_sub == name_in_vendor:
                 continue
-            print_error(f"{section} name mismatch: required '{name_in_vendor}' in "
-                        f"{vendor}.json but found '{name_in_sub}' in "
-                        f"{sub_file.relative_to(profiles_path)}")
+            print_error(
+                f"{section} name mismatch: required '{name_in_vendor}' in "
+                f"{vendor}.json but found '{name_in_sub}' in "
+                f"{sub_file.relative_to(profiles_path)}"
+            )
             error_count += 1
     return error_count, 0
 
@@ -1234,8 +1263,7 @@ def check_index_coverage(profiles_dir, vendor):
     for path, _sub in iter_profile_files(vendor_dir):
         if os.path.basename(path) in NON_PROFILE_FILES:
             continue  # data files carry no name or type and are never indexed
-        sub_path = posixpath.normpath(
-            os.path.relpath(path, vendor_dir).replace(os.sep, "/"))
+        sub_path = posixpath.normpath(os.path.relpath(path, vendor_dir).replace(os.sep, "/"))
         if sub_path in listed:
             continue
         try:
@@ -1245,12 +1273,10 @@ def check_index_coverage(profiles_dir, vendor):
         errors += 1
         if isinstance(data, dict) and data.get("type") in PROFILE_TYPES:
             gaps["unindexed"] += 1
-            print_error(f"{vendor}/{sub_path}: no {vendor}.json list references it, so "
-                        f"it never loads")
+            print_error(f"{vendor}/{sub_path}: no {vendor}.json list references it, so it never loads")
         else:
             gaps["unindexable"] += 1
-            print_error(f"{vendor}/{sub_path}: no {vendor}.json list references it and "
-                        f"it declares no profile type")
+            print_error(f"{vendor}/{sub_path}: no {vendor}.json list references it and it declares no profile type")
     return errors, gaps
 
 
@@ -1352,13 +1378,12 @@ def check_vector_type_keys(profiles_dir, vendor):
             continue
         for key in VECTOR_KEYS:
             if key in data and not isinstance(data[key], list):
-                print_error(f"'{key}' must be an array in {rel}, "
-                            f"got {type(data[key]).__name__}: {data[key]!r}")
+                print_error(f"'{key}' must be an array in {rel}, got {type(data[key]).__name__}: {data[key]!r}")
                 error_count += 1
     return error_count
 
 
-@functools.lru_cache(maxsize=None)
+@functools.cache
 def load_vendor_configs(profiles_dir, vendor):
     """name -> (tree-relative file, data) per config preset type, from the bundle's
     index lists - the per-kind maps the loader resolves inherits and include in.
@@ -1407,10 +1432,9 @@ def compose_config(name, presets, ofl_presets, cache, in_ofl=False, seen=frozens
     rel, data = bundle[name]
     config = {}
     if data.get("inherits"):
-        config.update(
-            compose_config(data["inherits"], presets, ofl_presets, cache, in_ofl, seen))
+        config.update(compose_config(data["inherits"], presets, ofl_presets, cache, in_ofl, seen))
     include = data.get("include") or []
-    for included in ([include] if isinstance(include, str) else include):
+    for included in [include] if isinstance(include, str) else include:
         if included in bundle:
             config.update(compose_config(included, presets, ofl_presets, cache, in_ofl, seen))
     config = {key: (value, path + (rel,)) for key, (value, path) in config.items()}
@@ -1452,14 +1476,15 @@ def _check_printer_layout(rel, config):
     extruders = len(_as_list(config.get("nozzle_diameter", [""])))
     types = _as_list(config.get("extruder_type", [DEFAULT_EXTRUDER_TYPE]))
     volume_types = _as_list(config.get("default_nozzle_volume_type", [DEFAULT_NOZZLE_VOLUME_TYPE]))
-    semm_off = str(_as_list(config.get("single_extruder_multi_material", ["1"]))[0]) \
-        .lower() in ("0", "false")
+    semm_off = str(_as_list(config.get("single_extruder_multi_material", ["1"]))[0]).lower() in ("0", "false")
     flat, ids = [], []
     if menu is not None:
         menu = _as_list(menu)
         if len(menu) != extruders:
-            print_error(f"{rel}: extruder_variant_list has {len(menu)} entries for {extruders} "
-                        f"extruder(s) (nozzle_diameter); it holds one entry per extruder")
+            print_error(
+                f"{rel}: extruder_variant_list has {len(menu)} entries for {extruders} "
+                f"extruder(s) (nozzle_diameter); it holds one entry per extruder"
+            )
             errors += 1
         for i, entry in enumerate(menu):
             variants = entry.split(",")
@@ -1467,52 +1492,67 @@ def _check_printer_layout(rel, config):
             ids += [str(i + 1)] * len(variants)
             extruder_type = _per_extruder(types, i)
             if not all(v.startswith(extruder_type + " ") for v in variants):
-                print_error(f'{rel}: extruder_variant_list entry {i + 1} "{entry}" holds a '
-                            f"variant that does not start with extruder {i + 1}'s "
-                            f'extruder_type "{extruder_type}"')
+                print_error(
+                    f'{rel}: extruder_variant_list entry {i + 1} "{entry}" holds a '
+                    f"variant that does not start with extruder {i + 1}'s "
+                    f'extruder_type "{extruder_type}"'
+                )
                 errors += 1
             if f"{extruder_type} {_per_extruder(volume_types, i)}" not in variants:
-                print_error(f'{rel}: default_nozzle_volume_type "{_per_extruder(volume_types, i)}" is '
-                            f'not a nozzle volume type extruder {i + 1} lists ("{entry}")')
+                print_error(
+                    f'{rel}: default_nozzle_volume_type "{_per_extruder(volume_types, i)}" is '
+                    f'not a nozzle volume type extruder {i + 1} lists ("{entry}")'
+                )
                 errors += 1
     if variant is not None:
         variant = _as_list(variant)
         written_ids = config.get("printer_extruder_id")
         pair_ids = ["1"] * len(variant) if written_ids is None else _as_list(written_ids)
         if len(pair_ids) != len(variant):
-            print_error(f"{rel}: printer_extruder_id has {len(pair_ids)} entries for the "
-                        f"{len(variant)} entries of printer_extruder_variant")
+            print_error(
+                f"{rel}: printer_extruder_id has {len(pair_ids)} entries for the {len(variant)} entries of printer_extruder_variant"
+            )
             errors += 1
     if menu is not None and variant is not None:
         if variant != flat:
-            print_error(f"{rel}: printer_extruder_variant {json.dumps(variant)} is not "
-                        f"extruder_variant_list flattened extruder-major {json.dumps(flat)}")
+            print_error(
+                f"{rel}: printer_extruder_variant {json.dumps(variant)} is not "
+                f"extruder_variant_list flattened extruder-major {json.dumps(flat)}"
+            )
             errors += 1
         elif pair_ids != ids:
-            print_error(f"{rel}: printer_extruder_id {json.dumps(pair_ids)}"
-                        f"{' (absent, so extruder 1 everywhere)' if written_ids is None else ''} "
-                        f"does not give each entry of printer_extruder_variant its 1-based "
-                        f"extruder {json.dumps(ids)}")
+            print_error(
+                f"{rel}: printer_extruder_id {json.dumps(pair_ids)}"
+                f"{' (absent, so extruder 1 everywhere)' if written_ids is None else ''} "
+                f"does not give each entry of printer_extruder_variant its 1-based "
+                f"extruder {json.dumps(ids)}"
+            )
             errors += 1
     elif menu is not None:
         if len(flat) > 1:
-            print_error(f"{rel}: extruder_variant_list offers {len(flat)} variants but the "
-                        f"preset writes no printer_extruder_variant/printer_extruder_id, so the "
-                        f'loader sizes every variant array to the single default variant '
-                        f'"{DEFAULT_VARIANT}" and no other variant has a value; write the pair')
+            print_error(
+                f"{rel}: extruder_variant_list offers {len(flat)} variants but the "
+                f"preset writes no printer_extruder_variant/printer_extruder_id, so the "
+                f"loader sizes every variant array to the single default variant "
+                f'"{DEFAULT_VARIANT}" and no other variant has a value; write the pair'
+            )
             errors += 1
     else:
         crowded = [i for i in dict.fromkeys(pair_ids) if pair_ids.count(i) > 1]
         if crowded:
-            print_error(f"{rel}: printer_extruder_variant lists several variants for extruder "
-                        f"{crowded[0]} but the preset writes no extruder_variant_list, so the "
-                        f"sidebar offers no variant switch and the extra variants are unreachable")
+            print_error(
+                f"{rel}: printer_extruder_variant lists several variants for extruder "
+                f"{crowded[0]} but the preset writes no extruder_variant_list, so the "
+                f"sidebar offers no variant switch and the extra variants are unreachable"
+            )
             errors += 1
         elif semm_off and variant != [DEFAULT_VARIANT] * extruders:
-            print_warning(f"{rel}: with single_extruder_multi_material off the loader replaces "
-                          f"printer_extruder_variant {json.dumps(variant)} by one "
-                          f'"{DEFAULT_VARIANT}" per extruder, because extruder_variant_list is '
-                          f"absent; write the list or drop the pair")
+            print_warning(
+                f"{rel}: with single_extruder_multi_material off the loader replaces "
+                f"printer_extruder_variant {json.dumps(variant)} by one "
+                f'"{DEFAULT_VARIANT}" per extruder, because extruder_variant_list is '
+                f"absent; write the list or drop the pair"
+            )
             warnings += 1
     return errors, warnings
 
@@ -1535,8 +1575,7 @@ def _variant_length(ptype, config):
         return 1, f"no {list_key}, so the single default variant"
     if "extruder_variant_list" in config:
         menu = _as_list(config["extruder_variant_list"][0])
-        return (sum(len(entry.split(",")) for entry in menu),
-                f"no {list_key}, so the variants extruder_variant_list offers")
+        return (sum(len(entry.split(",")) for entry in menu), f"no {list_key}, so the variants extruder_variant_list offers")
     extruders = len(_as_list(config["nozzle_diameter"][0])) if "nozzle_diameter" in config else 1
     return extruders, f"no {list_key}, so one default variant per extruder"
 
@@ -1582,11 +1621,8 @@ def _variant_entries(key, value):
     reads it: extruder_variant_list holds one ","-joined menu per extruder, the other
     three one variant per array entry."""
     if key == "extruder_variant_list":
-        return [(f"extruder {i}", variant)
-                for i, entry in enumerate(_as_list(value), 1)
-                for variant in str(entry).split(",")]
-    return [(f"entry {i}", str(variant))
-            for i, variant in enumerate(_as_list(value), 1)]
+        return [(f"extruder {i}", variant) for i, entry in enumerate(_as_list(value), 1) for variant in str(entry).split(",")]
+    return [(f"entry {i}", str(variant)) for i, variant in enumerate(_as_list(value), 1)]
 
 
 def _check_variant_string(rel, key, where, variant):
@@ -1602,36 +1638,42 @@ def _check_variant_string(rel, key, where, variant):
     extruder_types, volume_types, legacy, _extruder_legacy = _variant_names()
 
     if not variant:
-        print_error(f"{rel}: {key} {where} is empty; every entry names one variant, "
-                    f'"<extruder type> <nozzle volume type>"')
+        print_error(f'{rel}: {key} {where} is empty; every entry names one variant, "<extruder type> <nozzle volume type>"')
         return 1
     # Longest first, so an extruder type that is a prefix of another cannot win.
-    extruder = next((t for t in sorted(extruder_types, key=len, reverse=True)
-                     if variant.startswith(t + " ")), None)
+    extruder = next((t for t in sorted(extruder_types, key=len, reverse=True) if variant.startswith(t + " ")), None)
     if extruder is None:
         # "DirectDrive" is rewritten in extruder_type alone, so a variant string
         # carrying it is dead.
-        print_error(f'{rel}: {key} {where} holds "{variant}", which no extruder can '
-                    f"select: it does not start with an extruder type the enum has "
-                    f'({", ".join(sorted(extruder_types))}); a variant is '
-                    f'"<extruder type> <nozzle volume type>"')
+        print_error(
+            f'{rel}: {key} {where} holds "{variant}", which no extruder can '
+            f"select: it does not start with an extruder type the enum has "
+            f"({', '.join(sorted(extruder_types))}); a variant is "
+            f'"<extruder type> <nozzle volume type>"'
+        )
         return 1
-    volume = variant[len(extruder) + 1:]
+    volume = variant[len(extruder) + 1 :]
     if volume in volume_types:
         return 0
     if volume in legacy:
-        print_error(f'{rel}: {key} {where} holds the legacy variant "{variant}"; the '
-                    f'loader still rewrites "{volume}" to "{legacy[volume]}", but a '
-                    f'profile writes the enum name: "{extruder} {legacy[volume]}"')
+        print_error(
+            f'{rel}: {key} {where} holds the legacy variant "{variant}"; the '
+            f'loader still rewrites "{volume}" to "{legacy[volume]}", but a '
+            f'profile writes the enum name: "{extruder} {legacy[volume]}"'
+        )
     elif volume in RUNTIME_VOLUME_TYPES:
-        print_error(f'{rel}: {key} {where} holds "{variant}", which no extruder can '
-                    f"select: Hybrid names the sub-nozzles of one hybrid extruder at "
-                    f"runtime, never a nozzle volume type a profile writes")
+        print_error(
+            f'{rel}: {key} {where} holds "{variant}", which no extruder can '
+            f"select: Hybrid names the sub-nozzles of one hybrid extruder at "
+            f"runtime, never a nozzle volume type a profile writes"
+        )
     else:
-        print_error(f'{rel}: {key} {where} holds "{variant}", which no extruder can '
-                    f'select: "{volume}" is not a nozzle volume type the enum has '
-                    f'({", ".join(sorted(volume_types))}), so nothing selects the variant '
-                    f"and the values tuned for it never reach the G-code")
+        print_error(
+            f'{rel}: {key} {where} holds "{variant}", which no extruder can '
+            f'select: "{volume}" is not a nozzle volume type the enum has '
+            f"({', '.join(sorted(volume_types))}), so nothing selects the variant "
+            f"and the values tuned for it never reach the G-code"
+        )
     return 1
 
 
@@ -1652,7 +1694,8 @@ def _variant_repeats(data):
             f'filament_extruder_variant lists "{v}" {variants.count(v)} times; a '
             f"filament's variants are matched by exact string, so the repeat is a "
             f"variant nothing selects and its value sits at an index no extruder reads"
-            for v in sorted({v for v in variants if variants.count(v) > 1})]
+            for v in sorted({v for v in variants if variants.count(v) > 1})
+        ]
     if "extruder_variant_list" in data:
         for i, entry in enumerate(_as_list(data["extruder_variant_list"]), 1):
             variants = str(entry).split(",")
@@ -1661,7 +1704,8 @@ def _variant_repeats(data):
                 f"{variants.count(v)} times; the sidebar offers it once, so the repeat "
                 f"is a variant nothing selects and the arrays hold a value no extruder "
                 f"reads"
-                for v in sorted({v for v in variants if variants.count(v) > 1})]
+                for v in sorted({v for v in variants if variants.count(v) > 1})
+            ]
     if "print_extruder_variant" in data and "print_extruder_id" in data:
         ids = _as_list(data["print_extruder_id"])
         variants = _as_list(data["print_extruder_variant"])
@@ -1671,7 +1715,8 @@ def _variant_repeats(data):
                 f'print_extruder_variant lists the pair (extruder {i}, "{v}") '
                 f"{pairs.count((i, v))} times; a variant is found by that pair, so the "
                 f"repeat is unreachable"
-                for i, v in sorted({p for p in pairs if pairs.count(p) > 1})]
+                for i, v in sorted({p for p in pairs if pairs.count(p) > 1})
+            ]
     return messages
 
 
@@ -1686,22 +1731,27 @@ def _check_variant_seed(rel, option, value, allowed, legacy, runtime=frozenset()
     the engine computes for itself, are errors too. Returns the error count.
     """
     errors = 0
-    for name in ([] if value is None else _as_list(value)):
+    for name in [] if value is None else _as_list(value):
         name = str(name)
         if name in allowed:
             continue
         if name in legacy:
-            print_error(f'{rel}: {option} spells the legacy name "{name}"; the loader '
-                        f'still rewrites it to "{legacy[name]}", but a profile writes the '
-                        f"enum name")
+            print_error(
+                f'{rel}: {option} spells the legacy name "{name}"; the loader '
+                f'still rewrites it to "{legacy[name]}", but a profile writes the '
+                f"enum name"
+            )
         elif name in runtime:
-            print_error(f'{rel}: {option} names "{name}", which the engine computes '
-                        f"for a hybrid extruder at runtime; no profile writes it")
+            print_error(
+                f'{rel}: {option} names "{name}", which the engine computes for a hybrid extruder at runtime; no profile writes it'
+            )
         else:
-            print_error(f'{rel}: {option} "{name}" is not one of '
-                        f'({", ".join(sorted(allowed))}); the option is an enum, so an '
-                        f"unknown value fails loading the whole bundle in the validator "
-                        f"and silently becomes the default in the app")
+            print_error(
+                f'{rel}: {option} "{name}" is not one of '
+                f"({', '.join(sorted(allowed))}); the option is an enum, so an "
+                f"unknown value fails loading the whole bundle in the validator "
+                f"and silently becomes the default in the app"
+            )
         errors += 1
     return errors
 
@@ -1739,8 +1789,7 @@ def check_variant_names(profiles_dir, vendor):
     for path, _sub in iter_profile_files(vendor_dir):
         if os.path.basename(path) in NON_PROFILE_FILES:
             continue
-        sub_path = posixpath.normpath(
-            os.path.relpath(path, vendor_dir).replace(os.sep, "/"))
+        sub_path = posixpath.normpath(os.path.relpath(path, vendor_dir).replace(os.sep, "/"))
         if sub_path not in listed:
             continue
         try:
@@ -1752,8 +1801,7 @@ def check_variant_names(profiles_dir, vendor):
             continue
         rel = f"{vendor}/{sub_path}"
 
-        for key in ("extruder_variant_list", "printer_extruder_variant",
-                    "print_extruder_variant", "filament_extruder_variant"):
+        for key in ("extruder_variant_list", "printer_extruder_variant", "print_extruder_variant", "filament_extruder_variant"):
             if key in data:
                 for where, variant in _variant_entries(key, data[key]):
                     errors += _check_variant_string(rel, key, where, variant)
@@ -1763,11 +1811,9 @@ def check_variant_names(profiles_dir, vendor):
         for message in _variant_repeats(data):
             print_error(f"{rel}: {message}")
             errors += 1
-        errors += _check_variant_seed(rel, "extruder_type", data.get("extruder_type"),
-                                      extruder_types, extruder_legacy)
+        errors += _check_variant_seed(rel, "extruder_type", data.get("extruder_type"), extruder_types, extruder_legacy)
         for option in ("nozzle_volume_type", "default_nozzle_volume_type"):
-            errors += _check_variant_seed(rel, option, data.get(option), volume_types,
-                                          legacy, RUNTIME_VOLUME_TYPES)
+            errors += _check_variant_seed(rel, option, data.get(option), volume_types, legacy, RUNTIME_VOLUME_TYPES)
     return errors
 
 
@@ -1791,15 +1837,13 @@ def check_variant_arrays(profiles_dir, vendor, strict=False):
     print_extruder_id. Returns (errors, warnings).
     """
     errors = warnings = 0
-    for ptype, rel, data, config, variant_length, reason in _variant_presets(profiles_dir,
-                                                                             vendor):
+    for ptype, rel, data, config, variant_length, reason in _variant_presets(profiles_dir, vendor):
         if data.get("instantiation") != "true":
             continue
         list_key, strides = _variant_scheme()[ptype]
         listed = list_key in config
         for key, stride in sorted(strides.items()):
-            if key not in config or (listed and key in ("printer_extruder_id",
-                                                         "print_extruder_id")):
+            if key not in config or (listed and key in ("printer_extruder_id", "print_extruder_id")):
                 continue
             if key not in data and not strict:
                 continue
@@ -1807,10 +1851,12 @@ def check_variant_arrays(profiles_dir, vendor, strict=False):
             width, need = len(_as_list(value)), variant_length * stride
             if width == need:
                 continue
-            print_error(f'{rel}: "{key}" has {width} values for variant length {variant_length}'
-                        f"{' (' + reason + ')' if reason else ''} at stride {stride}, "
-                        f"which takes {need}"
-                        f"{'' if key in data else ' (it comes from ' + path[0] + ')'}")
+            print_error(
+                f'{rel}: "{key}" has {width} values for variant length {variant_length}'
+                f"{' (' + reason + ')' if reason else ''} at stride {stride}, "
+                f"which takes {need}"
+                f"{'' if key in data else ' (it comes from ' + path[0] + ')'}"
+            )
             errors += 1
         config = {key: value for key, (value, _path) in config.items()}
         if ptype == "machine":
@@ -1822,14 +1868,18 @@ def check_variant_arrays(profiles_dir, vendor, strict=False):
             if "print_extruder_id" in config:
                 ids = _as_list(config["print_extruder_id"])
                 if len(ids) != variant_length:
-                    print_error(f"{rel}: print_extruder_id has {len(ids)} entries for the "
-                                f"{variant_length} entries of print_extruder_variant; the two "
-                                f"list the (extruder id, variant) pairs, one per entry")
+                    print_error(
+                        f"{rel}: print_extruder_id has {len(ids)} entries for the "
+                        f"{variant_length} entries of print_extruder_variant; the two "
+                        f"list the (extruder id, variant) pairs, one per entry"
+                    )
                     errors += 1
             elif len(set(variants)) < len(variants):
-                print_warning(f"{rel}: print_extruder_variant repeats a variant but "
-                              f"print_extruder_id is absent, so every entry defaults to "
-                              f"extruder 1 and the repeated variant is unreachable")
+                print_warning(
+                    f"{rel}: print_extruder_variant repeats a variant but "
+                    f"print_extruder_id is absent, so every entry defaults to "
+                    f"extruder 1 and the repeated variant is unreachable"
+                )
                 warnings += 1
     return errors, warnings
 
@@ -1934,6 +1984,7 @@ def check_normalized(profiles_dir, vendor):
 # check
 # ---------------------------------------------------------------------------
 
+
 def check_profiles(profiles_dir=PROFILES_DIR, vendors=None, strict=False):
     """Validate the whole profile tree. Returns the error count.
 
@@ -1993,7 +2044,7 @@ def check_profiles(profiles_dir=PROFILES_DIR, vendors=None, strict=False):
     # bundles with an index, exactly what those two commands take; a --vendor is
     # passed through as given, so a bundle whose index has not landed yet still has
     # its files held to what normalize writes.
-    for vendor in (vendors or list_vendor_names(profiles_dir)):
+    for vendor in vendors or list_vendor_names(profiles_dir):
         new_errors, gaps = check_normalized(profiles_dir, vendor)
         errors_found += new_errors
         remedies.update(gaps)
@@ -2031,6 +2082,7 @@ def check_profiles(profiles_dir=PROFILES_DIR, vendors=None, strict=False):
 # Binary IO throughout: a profile keeps its original line endings (LF or CRLF),
 # its BOM and its exact formatting apart from the one line being touched.
 
+
 def insert_key_line(text, key, value, before=(), after=()):
     """Insert a `"key": value` line into a preset that lacks one.
 
@@ -2038,14 +2090,13 @@ def insert_key_line(text, key, value, before=(), after=()):
     canonical key order), else just after the first `after` anchor, reusing that
     anchor line's indentation and line ending. Returns (text, insertions made).
     """
+
     def line(m):
-        return (f'{m.group(1)}"{key}": {json.dumps(value, ensure_ascii=False)},'
-                f'{m.group(2)}')
+        return f'{m.group(1)}"{key}": {json.dumps(value, ensure_ascii=False)},{m.group(2)}'
 
     for anchors, at_start in ((before, True), (after, False)):
         for anchor in anchors:
-            m = re.search(r'^([ \t]*)"' + re.escape(anchor) + r'"[ \t]*:.*?(\r?\n)',
-                          text, re.MULTILINE)
+            m = re.search(r'^([ \t]*)"' + re.escape(anchor) + r'"[ \t]*:.*?(\r?\n)', text, re.MULTILINE)
             if m:
                 cut = m.start() if at_start else m.end()
                 return text[:cut] + line(m) + text[cut:], 1
@@ -2059,12 +2110,9 @@ def replace_key_value(text, key, new_value, old_value=None):
     rewrite fails loudly instead of clobbering an unexpected id.
     Returns (text, replacements made).
     """
-    value = (re.escape(json.dumps(old_value, ensure_ascii=False))
-             if old_value is not None else _JSON_STR)
-    pattern = re.compile(
-        r'(^[ \t]*"' + re.escape(key) + r'"[ \t]*:[ \t]*)' + value, re.MULTILINE)
-    return pattern.subn(
-        lambda m: m.group(1) + json.dumps(new_value, ensure_ascii=False), text, count=1)
+    value = re.escape(json.dumps(old_value, ensure_ascii=False)) if old_value is not None else _JSON_STR
+    pattern = re.compile(r'(^[ \t]*"' + re.escape(key) + r'"[ \t]*:[ \t]*)' + value, re.MULTILINE)
+    return pattern.subn(lambda m: m.group(1) + json.dumps(new_value, ensure_ascii=False), text, count=1)
 
 
 def delete_key_line(text, key, old_value=None):
@@ -2074,15 +2122,14 @@ def delete_key_line(text, key, old_value=None):
     layout (comma on the preceding line, consumed so no dangling comma is left).
     Returns (text, deletions made).
     """
-    value = (re.escape(json.dumps(old_value, ensure_ascii=False))
-             if old_value is not None else _JSON_STR)
+    value = re.escape(json.dumps(old_value, ensure_ascii=False)) if old_value is not None else _JSON_STR
     member = r'"' + re.escape(key) + r'"[ \t]*:[ \t]*' + value
-    m = re.search(r'^[ \t]*' + member + r'[ \t]*,[ \t]*\r?\n', text, re.MULTILINE)
+    m = re.search(r"^[ \t]*" + member + r"[ \t]*,[ \t]*\r?\n", text, re.MULTILINE)
     if m:
-        return text[:m.start()] + text[m.end():], 1
-    m = re.search(r',[ \t]*\r?\n[ \t]*' + member + r'[ \t]*(?=\r?\n)', text)
+        return text[: m.start()] + text[m.end() :], 1
+    m = re.search(r",[ \t]*\r?\n[ \t]*" + member + r"[ \t]*(?=\r?\n)", text)
     if m:
-        return text[:m.start()] + text[m.end():], 1
+        return text[: m.start()] + text[m.end() :], 1
     return text, 0
 
 
@@ -2118,12 +2165,14 @@ def set_array_value(text, key, values):
     for name, _key_start, start, end in reversed(members):  # json.load keeps the last
         if name == key:
             m = re.fullmatch(r"\[(\r?\n)([ \t]*).*(\r?\n)([ \t]*)\]", text[start:end], re.DOTALL)
-            array = ("[" + ", ".join(items) + "]" if m is None else
-                     "[" + m[1] + ("," + m[1]).join(m[2] + item for item in items)
-                     + m[3] + m[4] + "]")
+            array = (
+                "[" + ", ".join(items) + "]"
+                if m is None
+                else "[" + m[1] + ("," + m[1]).join(m[2] + item for item in items) + m[3] + m[4] + "]"
+            )
             return text[:start] + array + text[end:], 1
     _name, key_start, _start, end = members[-1]
-    indent = text[text.rfind("\n", 0, key_start) + 1:key_start]
+    indent = text[text.rfind("\n", 0, key_start) + 1 : key_start]
     nl = "\r\n" if "\r\n" in text else "\n"
     array = "[" + nl + ("," + nl).join(indent * 2 + item for item in items) + nl + indent + "]"
     return text[:end] + "," + nl + indent + json.dumps(key) + ": " + array + text[end:], 1
@@ -2131,8 +2180,7 @@ def set_array_value(text, key, values):
 
 def insert_filament_id(text, new_id):
     """Insert a `"filament_id"` line before `instantiation`, else after `name`."""
-    return insert_key_line(text, "filament_id", new_id,
-                           before=("instantiation",), after=("name",))
+    return insert_key_line(text, "filament_id", new_id, before=("instantiation",), after=("name",))
 
 
 def replace_filament_id_value(text, old_id, new_id):
@@ -2147,8 +2195,7 @@ def insert_setting_id(text, new_id):
     depend on whether filament_id has been written yet: a dry run, which does not
     write it, must reach the same verdict as the real run that does.
     """
-    return insert_key_line(text, "setting_id", new_id,
-                           before=("filament_id", "instantiation"), after=("name",))
+    return insert_key_line(text, "setting_id", new_id, before=("filament_id", "instantiation"), after=("name",))
 
 
 def _edit_profile(path, edit, dry_run=False, what="edit"):
@@ -2177,31 +2224,27 @@ def _edit_profile(path, edit, dry_run=False, what="edit"):
 
 def write_filament_id(path, new_id, dry_run=False):
     """Insert new_id into the profile at path, byte-preserving everything else."""
-    _edit_profile(path, lambda text: insert_filament_id(text, new_id),
-                  dry_run, "filament_id insert")
+    _edit_profile(path, lambda text: insert_filament_id(text, new_id), dry_run, "filament_id insert")
 
 
 def rewrite_filament_id(path, old_id, new_id, dry_run=False):
     """Replace the filament_id value old_id -> new_id; re-parses to verify."""
-    data = _edit_profile(path, lambda text: replace_filament_id_value(text, old_id, new_id),
-                         dry_run, "filament_id rewrite")
+    data = _edit_profile(path, lambda text: replace_filament_id_value(text, old_id, new_id), dry_run, "filament_id rewrite")
     if data.get("filament_id") != new_id:
-        raise RuntimeError(f'rewrite of filament_id "{old_id}" -> "{new_id}" in {path} '
-                           f"did not take effect")
+        raise RuntimeError(f'rewrite of filament_id "{old_id}" -> "{new_id}" in {path} did not take effect')
 
 
 # ---------------------------------------------------------------------------
 # generate-id
 # ---------------------------------------------------------------------------
 
+
 def _incomplete_triple(triple):
     """The name(s) of the empty mint-key fields, or "" when both are present."""
-    return " and ".join(k for k, v in (("filament_vendor", triple[0]),
-                                       ("filament_type", triple[1])) if not v)
+    return " and ".join(k for k, v in (("filament_vendor", triple[0]), ("filament_type", triple[1])) if not v)
 
 
-def generate_filament_ids(profiles_dir=PROFILES_DIR, vendors=None, dry_run=False,
-                          changed_paths=None):
+def generate_filament_ids(profiles_dir=PROFILES_DIR, vendors=None, dry_run=False, changed_paths=None):
     """Make every filament carry the id its own triple mints.
 
     One rule, applied to declarations and to id-less filaments alike:
@@ -2244,8 +2287,9 @@ def generate_filament_ids(profiles_dir=PROFILES_DIR, vendors=None, dry_run=False
     for fid, ts in sorted(analysis["collisions"].items()):
         print_error(
             f'cannot write filament_id "{fid}": it is the mint of {len(ts)} different '
-            f'products ({"; ".join("/".join(t) for t in ts)}), a base62 collision; '
-            f"rename one of them so their triples differ")
+            f"products ({'; '.join('/'.join(t) for t in ts)}), a base62 collision; "
+            f"rename one of them so their triples differ"
+        )
         errors += 1
         colliding.update(ts)
 
@@ -2255,18 +2299,17 @@ def generate_filament_ids(profiles_dir=PROFILES_DIR, vendors=None, dry_run=False
     inserted = 0
 
     # 1. Declarations that are not the mint of their own triple.
-    for vendor, rec, fid, triple in sorted(
-            analysis["declarer_triples"], key=lambda x: (x[0], x[1]["file"])):
+    for vendor, rec, fid, triple in sorted(analysis["declarer_triples"], key=lambda x: (x[0], x[1]["file"])):
         want = generate_filament_id(*triple)
-        if (fid == want or (wanted is not None and vendor not in wanted)
-                or triple in colliding):
+        if fid == want or (wanted is not None and vendor not in wanted) or triple in colliding:
             continue
         missing = _incomplete_triple(triple)
         if missing:
             print_error(
                 f'cannot re-mint "{rec["file"]}" (filament_id "{fid}"): resolves empty '
-                f'{missing}; the mint key needs both (generic materials use '
-                f'filament_vendor "Generic")')
+                f"{missing}; the mint key needs both (generic materials use "
+                f'filament_vendor "Generic")'
+            )
             errors += 1
             continue
         try:
@@ -2282,8 +2325,7 @@ def generate_filament_ids(profiles_dir=PROFILES_DIR, vendors=None, dry_run=False
             # setting_id pass reaches the same file through os.walk: normalize
             # or one file touched by both passes counts as two.
             changed_paths.add(os.path.normpath(rec["path"]))
-        print_info(f'{verb}rewrite {rec["file"]}: "{fid}" -> "{want}" '
-                   f'(triple "{"/".join(triple)}")')
+        print_info(f'{verb}rewrite {rec["file"]}: "{fid}" -> "{want}" (triple "{"/".join(triple)}")')
 
     # 2. Instantiated filaments that resolve no id at all, grouped by filament.
     filaments = {}  # (vendor, filament name) -> [rec]
@@ -2292,8 +2334,7 @@ def generate_filament_ids(profiles_dir=PROFILES_DIR, vendors=None, dry_run=False
             continue
         rec = analysis["vendors"][vendor][name]
         if rec["id_source"] in ("cycle", "dangling"):
-            print_error(f'cannot mint for "{vendor}/{name}": broken inherits chain '
-                        f'({rec["id_source"]})')
+            print_error(f'cannot mint for "{vendor}/{name}": broken inherits chain ({rec["id_source"]})')
             errors += 1
             continue
         filaments.setdefault((vendor, base_name(name)), []).append(rec)
@@ -2307,18 +2348,22 @@ def generate_filament_ids(profiles_dir=PROFILES_DIR, vendors=None, dry_run=False
         for rec in members:
             parent = rec.get("inherits")
             root = vendor_map.get(parent) if parent else None
-            if (root is None or root.get("filament_id")
-                    or base_name(root["name"]) != filament_name):
+            if root is None or root.get("filament_id") or base_name(root["name"]) != filament_name:
                 root = rec  # root-less member carries the id itself
             roots[root["name"]] = root
-        fields = {(resolve_filament_field(n, "filament_vendor", vendor_map, ofl_map),
-                   resolve_filament_field(n, "filament_type", vendor_map, ofl_map))
-                  for n in roots}
+        fields = {
+            (
+                resolve_filament_field(n, "filament_vendor", vendor_map, ofl_map),
+                resolve_filament_field(n, "filament_type", vendor_map, ofl_map),
+            )
+            for n in roots
+        }
         if len(fields) > 1:
             print_error(
                 f'cannot mint for filament "{vendor}/{filament_name}": its roots resolve '
                 f"divergent (filament_vendor, filament_type) pairs {sorted(fields)}; "
-                f"align the fields first")
+                f"align the fields first"
+            )
             errors += 1
             continue
         triple = (*next(iter(fields)), filament_name)
@@ -2328,8 +2373,9 @@ def generate_filament_ids(profiles_dir=PROFILES_DIR, vendors=None, dry_run=False
         if missing:
             print_error(
                 f'cannot mint for filament "{vendor}/{filament_name}": it resolves empty '
-                f'{missing}; the mint key needs both (generic materials use '
-                f'filament_vendor "Generic")')
+                f"{missing}; the mint key needs both (generic materials use "
+                f'filament_vendor "Generic")'
+            )
             errors += 1
             continue
         new_id = generate_filament_id(*triple)
@@ -2345,16 +2391,14 @@ def generate_filament_ids(profiles_dir=PROFILES_DIR, vendors=None, dry_run=False
             inserted += 1
             if changed_paths is not None:
                 changed_paths.add(os.path.normpath(root["path"]))
-            print_info(f'{verb}insert filament "{vendor}/{filament_name}": filament_id '
-                       f'"{new_id}" -> {root["file"]}')
+            print_info(f'{verb}insert filament "{vendor}/{filament_name}": filament_id "{new_id}" -> {root["file"]}')
 
     print_info(f"filament_ids inserted  : {inserted}")
     print_info(f"filament_ids re-minted : {reminted}")
     return files_changed, errors
 
 
-def generate_setting_ids(profiles_dir=PROFILES_DIR, vendors=None, dry_run=False,
-                         changed_paths=None):
+def generate_setting_ids(profiles_dir=PROFILES_DIR, vendors=None, dry_run=False, changed_paths=None):
     """Make every preset carry the setting_id its identity mints.
 
     One walk over filament/, process/ and machine/ of every vendor bundle, and
@@ -2378,8 +2422,7 @@ def generate_setting_ids(profiles_dir=PROFILES_DIR, vendors=None, dry_run=False,
             return 0, len(unknown)
         names = [v for v in names if v in wanted]
         for v in sorted(wanted & RESERVED_VENDORS):
-            print_info(f'{v} keeps its authoritative "G*" setting_ids; only its base '
-                       f"declarations are stripped")
+            print_info(f'{v} keeps its authoritative "G*" setting_ids; only its base declarations are stripped')
 
     verb = "would " if dry_run else ""
     files_changed = 0
@@ -2403,22 +2446,25 @@ def generate_setting_ids(profiles_dir=PROFILES_DIR, vendors=None, dry_run=False,
             instantiated = data.get("instantiation") == "true"
             edits = []  # (counter key, description, edit function)
             if "settings_id" in data:
-                edits.append(("typos", 'drop the misspelled "settings_id"',
-                              lambda text: delete_key_line(text, "settings_id")))
+                edits.append(("typos", 'drop the misspelled "settings_id"', lambda text: delete_key_line(text, "settings_id")))
                 typo = data["settings_id"]
-                if (vendor in RESERVED_VENDORS and instantiated and sid is None
-                        and isinstance(typo, str) and typo):
+                if vendor in RESERVED_VENDORS and instantiated and sid is None and isinstance(typo, str) and typo:
                     # A reserved vendor's ids are authoritative, so there is no
                     # formula to fall back on: correct the key and keep the
                     # value, or the drop would leave an instantiated preset with
                     # no setting_id and nothing able to give it one.
-                    edits.append(("assigned", 'restore its value as "setting_id"',
-                                  lambda text, new=typo: insert_setting_id(text, new)))
+                    edits.append(
+                        ("assigned", 'restore its value as "setting_id"', lambda text, new=typo: insert_setting_id(text, new))
+                    )
             if not instantiated:
                 if sid is not None:
-                    edits.append(("stripped", "strip the base profile's setting_id",
-                                  lambda text, old=sid: delete_key_line(
-                                      text, "setting_id", old)))
+                    edits.append(
+                        (
+                            "stripped",
+                            "strip the base profile's setting_id",
+                            lambda text, old=sid: delete_key_line(text, "setting_id", old),
+                        )
+                    )
             elif vendor not in RESERVED_VENDORS:
                 name = data.get("name")
                 if not name:
@@ -2429,12 +2475,15 @@ def generate_setting_ids(profiles_dir=PROFILES_DIR, vendors=None, dry_run=False,
                 else:
                     new_id = generate_preset_setting_id(vendor, type_name, name)
                     if sid is None:
-                        edits.append(("assigned", "insert the setting_id",
-                                      lambda text, new=new_id: insert_setting_id(text, new)))
+                        edits.append(("assigned", "insert the setting_id", lambda text, new=new_id: insert_setting_id(text, new)))
                     elif sid != new_id:
-                        edits.append(("assigned", "replace the setting_id",
-                                      lambda text, new=new_id, old=sid: replace_key_value(
-                                          text, "setting_id", new, old)))
+                        edits.append(
+                            (
+                                "assigned",
+                                "replace the setting_id",
+                                lambda text, new=new_id, old=sid: replace_key_value(text, "setting_id", new, old),
+                            )
+                        )
             if not edits:
                 continue
 
@@ -2457,12 +2506,11 @@ def generate_setting_ids(profiles_dir=PROFILES_DIR, vendors=None, dry_run=False,
             for key, _what, _edit in edits:
                 counts[key] += 1
             rel = os.path.relpath(path, profiles_dir).replace(os.sep, "/")
-            print_info(f"{verb}update {rel}: "
-                       f"{', '.join(what for _key, what, _edit in edits)}")
+            print_info(f"{verb}update {rel}: {', '.join(what for _key, what, _edit in edits)}")
 
     print_info(f'misspelled "settings_id" dropped : {counts["typos"]}')
-    print_info(f'base setting_ids stripped        : {counts["stripped"]}')
-    print_info(f'setting_ids assigned             : {counts["assigned"]}')
+    print_info(f"base setting_ids stripped        : {counts['stripped']}")
+    print_info(f"setting_ids assigned             : {counts['assigned']}")
     return files_changed, errors
 
 
@@ -2484,8 +2532,7 @@ def run_generate_id(profiles_dir, vendors, filament_id, setting_id, dry_run):
         _n, e = generate_setting_ids(profiles_dir, vendors, dry_run, changed)
         errors += e
 
-    summary = (f"dry run: {len(changed)} file(s) would change; nothing written"
-               if dry_run else f"{len(changed)} file(s) changed")
+    summary = f"dry run: {len(changed)} file(s) would change; nothing written" if dry_run else f"{len(changed)} file(s) changed"
     if errors:
         print_error(f"{summary}; {errors} error(s)")
     else:
@@ -2493,12 +2540,12 @@ def run_generate_id(profiles_dir, vendors, filament_id, setting_id, dry_run):
     return 1 if errors else 0
 
 
-
 # ---------------------------------------------------------------------------
 # Whole-file profile writes (normalize / update-index)
 # ---------------------------------------------------------------------------
 # Unlike the byte-preserving id edits above, these reserialise a whole file: they
 # reorder keys and normalize formatting by design.
+
 
 def _rel(path, profiles_dir):
     """Tree-relative, forward-slashed path - what every message below prints."""
@@ -2542,8 +2589,7 @@ def create_ordered_profile(profile, priority_fields):
 # ---------------------------------------------------------------------------
 
 # The keys that identify a preset, hoisted to the top of every rewritten file.
-NORMALIZE_FIELD_ORDER = ("type", "name", "renamed_from", "inherits", "from",
-                   "setting_id", "filament_id", "instantiation")
+NORMALIZE_FIELD_ORDER = ("type", "name", "renamed_from", "inherits", "from", "setting_id", "filament_id", "instantiation")
 
 
 def identity_block_misplaced(keys):
@@ -2555,18 +2601,27 @@ def identity_block_misplaced(keys):
     a file that breaks this rule reported as already normalized.
     """
     present = [k for k in keys if k in NORMALIZE_FIELD_ORDER]
-    return (keys[:len(present)] != present
-            or present != [k for k in NORMALIZE_FIELD_ORDER if k in keys])
+    return keys[: len(present)] != present or present != [k for k in NORMALIZE_FIELD_ORDER if k in keys]
 
 
 # Settings a filament profile must not pin: they belong to the process.
-FILAMENT_DROP_FIELDS = ("initial_layer_print_speed", "outer_wall_speed",
-                        "inner_wall_speed", "infill_speed", "top_surface_speed",
-                        "travel_speed")
+FILAMENT_DROP_FIELDS = (
+    "initial_layer_print_speed",
+    "outer_wall_speed",
+    "inner_wall_speed",
+    "infill_speed",
+    "top_surface_speed",
+    "travel_speed",
+)
 # Filament options the config system stores as vectors, written as scalars by hand.
-FILAMENT_ARRAY_FIELDS = ("filament_cost", "filament_density", "filament_type",
-                         "temperature_vitrification", "filament_max_volumetric_speed",
-                         "filament_vendor")
+FILAMENT_ARRAY_FIELDS = (
+    "filament_cost",
+    "filament_density",
+    "filament_type",
+    "temperature_vitrification",
+    "filament_max_volumetric_speed",
+    "filament_vendor",
+)
 
 
 def _normalize_profile(data, sub):
@@ -2601,10 +2656,11 @@ def _normalize_profile(data, sub):
     # profiles carry both with different values, and the slicer cannot tell which one
     # to obey - a toolhead collision waiting to happen. Keep the larger one only.
     if "extruder_clearance_radius" in data and "extruder_clearance_max_radius" in data:
-        drop = ("extruder_clearance_radius"
-                if float(data["extruder_clearance_max_radius"])
-                > float(data["extruder_clearance_radius"])
-                else "extruder_clearance_max_radius")
+        drop = (
+            "extruder_clearance_radius"
+            if float(data["extruder_clearance_max_radius"]) > float(data["extruder_clearance_radius"])
+            else "extruder_clearance_max_radius"
+        )
         del data[drop]
         changes.append(f"drop conflicting {drop}")
 
@@ -2626,8 +2682,7 @@ def _normalize_profile(data, sub):
     return changes
 
 
-def normalize_profiles(profiles_dir=PROFILES_DIR, vendors=None, profile_types=None,
-                 force=False, dry_run=False):
+def normalize_profiles(profiles_dir=PROFILES_DIR, vendors=None, profile_types=None, force=False, dry_run=False):
     """Normalize profile files in place. Returns (files changed, errors).
 
     Adds a missing "type", drops keys the slicer no longer reads, resolves the
@@ -2663,8 +2718,7 @@ def normalize_profiles(profiles_dir=PROFILES_DIR, vendors=None, profile_types=No
                     print_info(f"{rel}: would be rewritten")
                     continue
                 try:
-                    write_profile_json(
-                        path, create_ordered_profile(data, NORMALIZE_FIELD_ORDER))
+                    write_profile_json(path, create_ordered_profile(data, NORMALIZE_FIELD_ORDER))
                 except OSError as e:
                     print_error(f"{rel}: {e}")
                     errors += 1
@@ -2680,8 +2734,8 @@ def normalize_profiles(profiles_dir=PROFILES_DIR, vendors=None, profile_types=No
 # trim
 # ---------------------------------------------------------------------------
 
-def trim_profiles(profiles_dir=PROFILES_DIR, vendors=None, profile_types=None,
-                  dry_run=False):
+
+def trim_profiles(profiles_dir=PROFILES_DIR, vendors=None, profile_types=None, dry_run=False):
     """Delete profile files that a vendor's <vendor>.json does not index.
 
     The loader only ever reads the sub_paths listed in <vendor>.json, so a profile
@@ -2725,14 +2779,13 @@ def trim_profiles(profiles_dir=PROFILES_DIR, vendors=None, profile_types=None,
                     # same file as "filament/X.json" and must not read as an orphan.
                     listed.add(posixpath.normpath(sub_path.replace("\\", "/")))
 
-        candidates = {}    # path -> profile, for every unindexed preset
+        candidates = {}  # path -> profile, for every unindexed preset
         inherited = set()  # every name the files that stay claim as a parent or include
-        provided = {}      # name -> sub_path, for the profiles the loader can see
+        provided = {}  # name -> sub_path, for the profiles the loader can see
         for sub in subs:
             for path in _walk_json(os.path.join(vendor_dir, sub)):
                 rel = _rel(path, profiles_dir)
-                sub_path = posixpath.normpath(
-                    os.path.relpath(path, vendor_dir).replace(os.sep, "/"))
+                sub_path = posixpath.normpath(os.path.relpath(path, vendor_dir).replace(os.sep, "/"))
                 try:
                     profile = load_json(path)
                 except (ValueError, OSError) as e:
@@ -2753,8 +2806,7 @@ def trim_profiles(profiles_dir=PROFILES_DIR, vendors=None, profile_types=None,
         # a child resolves to, and its own parent needs rescuing on the same terms.
         kept = {}
         while True:
-            rescued = {p: d for p, d in candidates.items()
-                       if d.get("name") in inherited and d.get("name") not in provided}
+            rescued = {p: d for p, d in candidates.items() if d.get("name") in inherited and d.get("name") not in provided}
             if not rescued:
                 break
             for path, profile in rescued.items():
@@ -2763,8 +2815,10 @@ def trim_profiles(profiles_dir=PROFILES_DIR, vendors=None, profile_types=None,
                 inherited.update(profile_dependencies(profile))
 
         for path in sorted(kept):
-            print_warning(f"{_rel(path, profiles_dir)}: not indexed by {vendor}.json but "
-                          f'inherited from; keeping it (neither loads - fix the index)')
+            print_warning(
+                f"{_rel(path, profiles_dir)}: not indexed by {vendor}.json but "
+                f"inherited from; keeping it (neither loads - fix the index)"
+            )
 
         removed = 0
         for path in sorted(candidates):
@@ -2796,6 +2850,7 @@ def trim_profiles(profiles_dir=PROFILES_DIR, vendors=None, profile_types=None,
 # ---------------------------------------------------------------------------
 # update-index
 # ---------------------------------------------------------------------------
+
 
 def profile_dependencies(profile):
     """The names a profile needs loaded before it: its parent and every include."""
@@ -2862,7 +2917,7 @@ def build_index_sections(profiles_dir, vendor, profile_types=None):
     problems = []
     unplaceable = {}
     by_name = defaultdict(list)
-    for profile_type in (profile_types or PROFILE_TYPES):
+    for profile_type in profile_types or PROFILE_TYPES:
         entries = []
         for path in _walk_json(os.path.join(vendor_dir, _profile_subdir(profile_type))):
             if os.path.basename(path) in NON_PROFILE_FILES:
@@ -2895,27 +2950,29 @@ def build_index_sections(profiles_dir, vendor, profile_types=None):
             entries.append(entry)
 
         # inherits/include were ordering input only; the index holds name and sub_path
-        sections[profile_type + "_list"] = [{"name": e["name"], "sub_path": e["sub_path"]}
-                                            for e in topological_sort(entries)]
+        sections[profile_type + "_list"] = [{"name": e["name"], "sub_path": e["sub_path"]} for e in topological_sort(entries)]
 
     for rel, found in sorted(unplaceable.items()):
-        problems.append(f'{rel}: type {found!r} is not one of {list(PROFILE_TYPES)}, so it '
-                        f"cannot be indexed; run "
-                        f'"python scripts/orca_profile_tool.py normalize" first')
+        problems.append(
+            f"{rel}: type {found!r} is not one of {list(PROFILE_TYPES)}, so it "
+            f"cannot be indexed; run "
+            f'"python scripts/orca_profile_tool.py normalize" first'
+        )
 
     clashes = {name: subs for name, subs in by_name.items() if len(subs) > 1}
     for name, subs in sorted(clashes.items()):
-        problems.append(f'{vendor}.json: {len(subs)} profiles are named "{name}" '
-                        f'({", ".join(sorted(subs))}); only one can be indexed under '
-                        f"that name, so delete or rename the others - "
-                        f"preview unindexed-file cleanup with "
-                        f'"python scripts/orca_profile_tool.py trim --dry-run"')
+        problems.append(
+            f'{vendor}.json: {len(subs)} profiles are named "{name}" '
+            f"({', '.join(sorted(subs))}); only one can be indexed under "
+            f"that name, so delete or rename the others - "
+            f"preview unindexed-file cleanup with "
+            f'"python scripts/orca_profile_tool.py trim --dry-run"'
+        )
 
     return (None if clashes else sections), problems
 
 
-def update_profile_indexes(profiles_dir=PROFILES_DIR, vendors=None, profile_types=None,
-                           dry_run=False):
+def update_profile_indexes(profiles_dir=PROFILES_DIR, vendors=None, profile_types=None, dry_run=False):
     """Rebuild the *_list sections of each <vendor>.json from the files on disk.
 
     Returns (indexes changed, errors). See build_index_sections for what a file has to
@@ -2965,8 +3022,13 @@ def update_profile_indexes(profiles_dir=PROFILES_DIR, vendors=None, profile_type
 # ---------------------------------------------------------------------------
 
 # The members of the variant sets that name the variants rather than hold values.
-VARIANT_LAYOUT_KEYS = {"printer_extruder_variant", "printer_extruder_id", "print_extruder_variant",
-                       "print_extruder_id", "filament_extruder_variant"}
+VARIANT_LAYOUT_KEYS = {
+    "printer_extruder_variant",
+    "printer_extruder_id",
+    "print_extruder_variant",
+    "print_extruder_id",
+    "filament_extruder_variant",
+}
 
 
 def _fit_width(values, need, stride):
@@ -2977,7 +3039,7 @@ def _fit_width(values, need, stride):
         return values[:need]
     if len(values) == 1:
         return values * need
-    values = values[:len(values) - len(values) % stride]
+    values = values[: len(values) - len(values) % stride]
     return values + values[-stride:] * ((need - len(values)) // stride)
 
 
@@ -2997,9 +3059,12 @@ def fix_variant_arrays(profiles_dir=PROFILES_DIR, vendors=None, dry_run=False, s
     profiles_dir = str(profiles_dir)
     names = list_vendor_names(profiles_dir)
     scope = set(vendors or names)
-    files = {rel: data for vendor in names
-             for configs in load_vendor_configs(profiles_dir, vendor).values()
-             for rel, data in configs.values()}
+    files = {
+        rel: data
+        for vendor in names
+        for configs in load_vendor_configs(profiles_dir, vendor).values()
+        for rel, data in configs.values()
+    }
     verb = "would " if dry_run else ""
     changed, errors = set(), 0
 
@@ -3017,8 +3082,7 @@ def fix_variant_arrays(profiles_dir=PROFILES_DIR, vendors=None, dry_run=False, s
         users = defaultdict(list)  # (file, key) -> [(value, path, need, stride)]
         writes = defaultdict(dict)  # file -> {key: values}
         for vendor in names:
-            for ptype, rel, data, config, variant_length, _reason in _variant_presets(
-                    profiles_dir, vendor):
+            for ptype, rel, data, config, variant_length, _reason in _variant_presets(profiles_dir, vendor):
                 own[rel] = variant_length
                 instantiated = data.get("instantiation") == "true"
                 for key, stride in _variant_scheme()[ptype][1].items():
@@ -3040,10 +3104,16 @@ def fix_variant_arrays(profiles_dir=PROFILES_DIR, vendors=None, dry_run=False, s
                 for values, path, need, stride in group:
                     if len(values) == need or path[-1].split("/")[0] not in scope:
                         continue
-                    target = next((f for f in path if f.split("/")[0] in scope
-                                   and own[f] * stride == need
-                                   and all(n == need for _v, p, n, _s in group if f in p)),
-                                  path[-1])
+                    target = next(
+                        (
+                            f
+                            for f in path
+                            if f.split("/")[0] in scope
+                            and own[f] * stride == need
+                            and all(n == need for _v, p, n, _s in group if f in p)
+                        ),
+                        path[-1],
+                    )
                     fitted = fit(path[-1], key, values, need, stride)
                     if fitted:
                         writes[target][key] = fitted
@@ -3052,21 +3122,25 @@ def fix_variant_arrays(profiles_dir=PROFILES_DIR, vendors=None, dry_run=False, s
         if not writes or errors:
             break
         for rel, arrays in sorted(writes.items()):
+
             def apply(text, _arrays=arrays):
                 for key, values in _arrays.items():
                     text, _n = set_array_value(text, key, values)
                 return text, len(_arrays)
 
             try:
-                data = _edit_profile(os.path.join(profiles_dir, *rel.split("/")), apply, dry_run,
-                                     "variant array resize")
+                data = _edit_profile(os.path.join(profiles_dir, *rel.split("/")), apply, dry_run, "variant array resize")
             except (OSError, RuntimeError, ValueError) as e:
                 print_error(str(e))
                 errors += 1
                 continue
-            print_info(f"{verb}resize {rel}: " + ", ".join(
-                f"{key} {len(_as_list(files[rel][key])) if key in files[rel] else 'added'}"
-                f" -> {len(values)}" for key, values in arrays.items()))
+            print_info(
+                f"{verb}resize {rel}: "
+                + ", ".join(
+                    f"{key} {len(_as_list(files[rel][key])) if key in files[rel] else 'added'} -> {len(values)}"
+                    for key, values in arrays.items()
+                )
+            )
             files[rel].update(arrays)
             changed.add(rel)
             if any(data.get(key) != values for key, values in arrays.items()):
@@ -3086,8 +3160,7 @@ def fix_variant_arrays(profiles_dir=PROFILES_DIR, vendors=None, dry_run=False, s
 # legacy-compat
 # ---------------------------------------------------------------------------
 
-LEGACY_COMPAT_PATH = os.path.normpath(
-    os.path.join(SCRIPTS_DIR, "..", "resources", "info", "legacy_compatible_printers.json"))
+LEGACY_COMPAT_PATH = os.path.normpath(os.path.join(SCRIPTS_DIR, "..", "resources", "info", "legacy_compatible_printers.json"))
 
 
 def _renamed_from(data):
@@ -3106,6 +3179,7 @@ def _flatten_presets(profiles_dir):
     dict with its renamed_from and extruder variants. instantiation is read from the
     preset's own file, as the loader requires every file to state it.
     """
+
     def instantiated(data):
         return str(data.get("instantiation", "")).lower() == "true"
 
@@ -3228,10 +3302,11 @@ GCODE_DIFF_HEADER = (
     "## Custom G-code changes\n"
     "\n"
     "GitHub shows custom G-code in a profile as one long line, so below is a line by line "
-    "diff of each changed G-code or other text setting.\n")
+    "diff of each changed G-code or other text setting.\n"
+)
 
 
-@functools.lru_cache(maxsize=None)
+@functools.cache
 def _text_option_keys():
     """The string options PrintConfig.cpp defines as G-code or other multi-line text
     (every *_gcode option, and every one it marks multiline, such as notes), plus the
@@ -3241,8 +3316,7 @@ def _text_option_keys():
     keys = set()
     for body in re.split(r"\bdef\s*=\s*this->add(?:_nullable)?\(", source)[1:]:
         match = re.match(r'"(\w+)",\s*coStrings?\b', body)
-        if match and (match.group(1).endswith("_gcode")
-                      or re.search(r"def->multiline\s*=\s*true", body)):
+        if match and (match.group(1).endswith("_gcode") or re.search(r"def->multiline\s*=\s*true", body)):
             keys.add(match.group(1))
     if "machine_start_gcode" not in keys:
         raise RuntimeError(f"{PRINT_CONFIG_CPP} no longer defines machine_start_gcode")
@@ -3252,22 +3326,19 @@ def _text_option_keys():
             gui = f.read()
     except OSError:
         gui = ""
-    keys.update(re.findall(r'get_option\("(\w+)"\);(?:(?!get_option\().)*?\bis_code\s*=\s*true',
-                           gui, re.DOTALL))
+    keys.update(re.findall(r'get_option\("(\w+)"\);(?:(?!get_option\().)*?\bis_code\s*=\s*true', gui, re.DOTALL))
     return frozenset(keys)
 
 
 def _git(cwd, *args, stdin=None):
-    return subprocess.run(["git", "-C", cwd, *args], input=stdin, check=True,
-                          capture_output=True).stdout
+    return subprocess.run(["git", "-C", cwd, *args], input=stdin, check=True, capture_output=True).stdout
 
 
 def _blobs_at(profiles_dir, specs):
     """{(ref, path): bytes, or None if not a file there} for (ref, path relative to
     profiles_dir) pairs, all read by one git cat-file process."""
     prefix = _git(profiles_dir, "rev-parse", "--show-prefix").decode("utf-8").strip()
-    out = _git(profiles_dir, "cat-file", "--batch",
-               stdin="".join(f"{ref}:{prefix}{rel}\n" for ref, rel in specs).encode("utf-8"))
+    out = _git(profiles_dir, "cat-file", "--batch", stdin="".join(f"{ref}:{prefix}{rel}\n" for ref, rel in specs).encode("utf-8"))
     blobs, pos = {}, 0
     for spec in specs:
         end = out.index(b"\n", pos)
@@ -3278,7 +3349,7 @@ def _blobs_at(profiles_dir, specs):
             blobs[spec] = None
             continue
         _oid, kind, size = header.split()
-        blobs[spec] = out[pos:pos + int(size)] if kind == b"blob" else None
+        blobs[spec] = out[pos : pos + int(size)] if kind == b"blob" else None
         pos += int(size) + 1
     return blobs
 
@@ -3300,8 +3371,7 @@ def _changed_profiles(profiles_dir, base, head):
     base and head (the working tree, untracked files included, when None); the absent
     side of an added or deleted file is None, and so is a side that is not JSON. Renames
     are paired."""
-    out = _git(profiles_dir, "diff", "--name-status", "-z", "-M", "--relative", base,
-               *([head] if head else []), "--", ".")
+    out = _git(profiles_dir, "diff", "--name-status", "-z", "-M", "--relative", base, *([head] if head else []), "--", ".")
     fields = out.decode("utf-8").split("\0")
     pairs, i = [], 0
     while i + 1 < len(fields):
@@ -3318,8 +3388,7 @@ def _changed_profiles(profiles_dir, base, head):
             pairs.append((old, new))
     if head is None:
         out = _git(profiles_dir, "ls-files", "-z", "--others", "--exclude-standard", "--", ".")
-        pairs += [(None, rel) for rel in out.decode("utf-8").split("\0")
-                  if rel.endswith(".json") and rel.split("/")[0] != USER_DIR]
+        pairs += [(None, rel) for rel in out.decode("utf-8").split("\0") if rel.endswith(".json") and rel.split("/")[0] != USER_DIR]
     return pairs
 
 
@@ -3339,9 +3408,9 @@ def _text_changes(old, new):
             continue
         width = max(len(a), len(b))
         for i in range(width):
-            diff = list(difflib.unified_diff(
-                _text_lines(a[i] if i < len(a) else ""), _text_lines(b[i] if i < len(b) else ""),
-                lineterm=""))[2:]  # drops the ---/+++ file header
+            diff = list(
+                difflib.unified_diff(_text_lines(a[i] if i < len(a) else ""), _text_lines(b[i] if i < len(b) else ""), lineterm="")
+            )[2:]  # drops the ---/+++ file header
             if diff:
                 changes.append((key if width == 1 else f"{key}[{i}]", "\n".join(diff)))
     return changes
@@ -3350,26 +3419,31 @@ def _text_changes(old, new):
 def _gcode_diff_section(files, setting, diff):
     # A fence longer than any backtick run in the G-code cannot be closed by it.
     fence = "`" * max([3] + [len(run) + 1 for run in re.findall(r"`+", diff)])
+
     # In <code>, the "@BBL" of a filament file name does not mention a GitHub user.
     def code(text):
         return f"<code>{html.escape(text, quote=False)}</code>"
+
     names, listing = ", ".join(map(code, files)), ""
     if len(files) > GCODE_DIFF_SUMMARY_FILES + 1:  # never "and 1 more"
         listing = f"<p>{names}</p>\n\n"  # an HTML block, so markdown in names stays literal
-        names = (", ".join(map(code, files[:GCODE_DIFF_SUMMARY_FILES]))
-                 + f" and {len(files) - GCODE_DIFF_SUMMARY_FILES} more")
-    return (f"\n<details>\n<summary><b>{names} - {code(setting)} (click to expand)</b>"
-            f"</summary>\n\n{listing}{fence}diff\n{diff}\n{fence}\n\n</details>\n")
+        names = ", ".join(map(code, files[:GCODE_DIFF_SUMMARY_FILES])) + f" and {len(files) - GCODE_DIFF_SUMMARY_FILES} more"
+    return (
+        f"\n<details>\n<summary><b>{names} - {code(setting)} (click to expand)</b>"
+        f"</summary>\n\n{listing}{fence}diff\n{diff}\n{fence}\n\n</details>\n"
+    )
 
 
 def gcode_diff(profiles_dir, base, head=None, vendors=None):
     """Markdown with one collapsed diff per changed G-code setting between base and
     head, or "" when none changed. Files whose diff of a setting is identical share
     one section. Cut to whole sections under GCODE_DIFF_BUDGET."""
-    pairs = [(old, new) for old, new in _changed_profiles(profiles_dir, base, head)
-             if not vendors or any(p and p.split("/")[0] in vendors for p in (old, new))]
-    specs = ([(base, old) for old, _ in pairs if old]
-             + [(head, new) for _, new in pairs if new and head])
+    pairs = [
+        (old, new)
+        for old, new in _changed_profiles(profiles_dir, base, head)
+        if not vendors or any(p and p.split("/")[0] in vendors for p in (old, new))
+    ]
+    specs = [(base, old) for old, _ in pairs if old] + [(head, new) for _, new in pairs if new and head]
     blobs = _blobs_at(profiles_dir, specs) if specs else {}
 
     def load(ref, rel):
@@ -3393,8 +3467,7 @@ def gcode_diff(profiles_dir, base, head=None, vendors=None):
     if not groups:
         return ""
 
-    sections = [_gcode_diff_section(files, setting, diff)
-                for (setting, diff), files in groups.items()]
+    sections = [_gcode_diff_section(files, setting, diff) for (setting, diff), files in groups.items()]
     budget = GCODE_DIFF_BUDGET - len(GCODE_DIFF_HEADER.encode("utf-8"))
     shown = 0
     for section in sections:
@@ -3404,9 +3477,11 @@ def gcode_diff(profiles_dir, base, head=None, vendors=None):
         shown += 1
     note, hidden = "", len(sections) - shown
     if hidden:
-        note = (f"\n{hidden} of {len(sections)} sections {'is' if hidden == 1 else 'are'} not "
-                "shown because the comment would be too long for GitHub. See the Files "
-                "changed tab for the rest.\n")
+        note = (
+            f"\n{hidden} of {len(sections)} sections {'is' if hidden == 1 else 'are'} not "
+            "shown because the comment would be too long for GitHub. See the Files "
+            "changed tab for the rest.\n"
+        )
     return GCODE_DIFF_HEADER + "".join(sections[:shown]) + note
 
 
@@ -3421,8 +3496,7 @@ def _default_diff_base(profiles_dir, head):
 
 def run_gcode_diff(profiles_dir, vendors, base, head):
     try:
-        markdown = gcode_diff(profiles_dir, base or _default_diff_base(profiles_dir, head),
-                              head, vendors)
+        markdown = gcode_diff(profiles_dir, base or _default_diff_base(profiles_dir, head), head, vendors)
     # UnicodeDecodeError means git listed a file name that is not UTF-8.
     except (OSError, RuntimeError, UnicodeDecodeError, subprocess.CalledProcessError) as e:
         stderr = getattr(e, "stderr", None)
@@ -3464,16 +3538,14 @@ def next_version(version):
     patch, build = int(parts[2]), int(parts[3]) + 1
     if build > 99:
         patch, build = patch + 1, 0
-    return ".".join((parts[0], parts[1], str(patch).zfill(len(parts[2])),
-                     str(build).zfill(len(parts[3]))))
+    return ".".join((parts[0], parts[1], str(patch).zfill(len(parts[2])), str(build).zfill(len(parts[3]))))
 
 
 def _changed_paths(profiles_dir, base, head):
     """Every path under profiles_dir, relative to it, that differs between base and
     head (the working tree, untracked files included, when None). Renames are not
     paired, so a file moved between bundles changes both."""
-    out = _git(profiles_dir, "diff", "--name-only", "-z", "--no-renames", "--relative", base,
-               *([head] if head else []), "--", ".")
+    out = _git(profiles_dir, "diff", "--name-only", "-z", "--no-renames", "--relative", base, *([head] if head else []), "--", ".")
     paths = [rel for rel in out.decode("utf-8").split("\0") if rel]
     if head is None:
         out = _git(profiles_dir, "ls-files", "-z", "--others", "--exclude-standard", "--", ".")
@@ -3545,18 +3617,22 @@ def version_check(profiles_dir, base, head=None, vendors=None):
         found, new = index_version(head, vendor)
         if not found:
             if _is_dir_at(profiles_dir, head, vendor):
-                errors.append(f"{vendor}.json is missing in {where} while {vendor}/ still has "
-                              f"files; restore the index or delete the directory")
+                errors.append(
+                    f"{vendor}.json is missing in {where} while {vendor}/ still has "
+                    f"files; restore the index or delete the directory"
+                )
             continue
         if new is None:
             if _is_dir_at(profiles_dir, head, vendor):
-                errors.append(f"{vendor}.json has no version in {where}, so the app never "
-                              f"installs the bundle; write one (MM.mm.pp.bb)")
+                errors.append(
+                    f"{vendor}.json has no version in {where}, so the app never installs the bundle; write one (MM.mm.pp.bb)"
+                )
             continue
         new_key = _version_key(new)
         if new_key is None or new.count(".") != 3:
-            errors.append(f'{vendor}.json: version "{new}" in {where} is not four numbers '
-                          f"(MM.mm.pp.bb), which the profile update needs")
+            errors.append(
+                f'{vendor}.json: version "{new}" in {where} is not four numbers (MM.mm.pp.bb), which the profile update needs'
+            )
             continue
         found, old = index_version(base, vendor)
         old_key = _version_key(old)
@@ -3566,11 +3642,11 @@ def version_check(profiles_dir, base, head=None, vendors=None):
             label = None if not found else ("no version" if old is None else str(old))
             bumped.append((vendor, label, new, len(files)))
         else:
-            what = (f"version {new} was not bumped" if new == old
-                    else f"version {new} is not newer than {old} at {base}")
+            what = f"version {new} was not bumped" if new == old else f"version {new} is not newer than {old} at {base}"
             count = f"{len(files)} file" + ("" if len(files) == 1 else "s")
-            errors.append(f"{vendor}.json: {what}, but {count} of the bundle changed "
-                          f"({_file_summary(files)}); bump it to {next_version(old)}")
+            errors.append(
+                f"{vendor}.json: {what}, but {count} of the bundle changed ({_file_summary(files)}); bump it to {next_version(old)}"
+            )
     return bumped, errors
 
 
@@ -3584,8 +3660,7 @@ def run_version_check(profiles_dir, vendors, base, head):
         print_error(stderr.decode(errors="replace").strip() if stderr else str(e))
         return 1
     for vendor, old, new, count in bumped:
-        print(f"{vendor}: {old or 'new bundle'} -> {new}, {count} file"
-              f"{'' if count == 1 else 's'} changed")
+        print(f"{vendor}: {old or 'new bundle'} -> {new}, {count} file{'' if count == 1 else 's'} changed")
     for error in errors:
         print_error(error)
     if not bumped and not errors:
@@ -3640,47 +3715,66 @@ def build_parser():
     # Shared options, attached with parents=[...] so every command spells them the
     # same way and documents them once.
     profiles_opt = argparse.ArgumentParser(add_help=False)
-    profiles_opt.add_argument("--profiles", default=PROFILES_DIR, metavar="DIR",
-                              help="profiles directory (default: resources/profiles)")
+    profiles_opt.add_argument(
+        "--profiles", default=PROFILES_DIR, metavar="DIR", help="profiles directory (default: resources/profiles)"
+    )
 
     vendor_opt = argparse.ArgumentParser(add_help=False)
-    vendor_opt.add_argument("--vendor", metavar="VENDOR", action="append", default=[],
-                            help="act on this vendor bundle only; repeatable. "
-                                 "An empty value means every vendor")
+    vendor_opt.add_argument(
+        "--vendor",
+        metavar="VENDOR",
+        action="append",
+        default=[],
+        help="act on this vendor bundle only; repeatable. An empty value means every vendor",
+    )
 
     type_opt = argparse.ArgumentParser(add_help=False)
-    type_opt.add_argument("--profile-type", metavar="TYPE", action="append", default=[],
-                          choices=PROFILE_TYPES, dest="profile_type",
-                          help="act on this profile type only; repeatable. One of: "
-                               + ", ".join(PROFILE_TYPES))
+    type_opt.add_argument(
+        "--profile-type",
+        metavar="TYPE",
+        action="append",
+        default=[],
+        choices=PROFILE_TYPES,
+        dest="profile_type",
+        help="act on this profile type only; repeatable. One of: " + ", ".join(PROFILE_TYPES),
+    )
 
     dry_run_opt = argparse.ArgumentParser(add_help=False)
-    dry_run_opt.add_argument("--dry-run", "--dryrun", dest="dry_run", action="store_true",
-                             help="report what would change and write nothing")
+    dry_run_opt.add_argument(
+        "--dry-run", "--dryrun", dest="dry_run", action="store_true", help="report what would change and write nothing"
+    )
 
     parser = argparse.ArgumentParser(
-        prog="orca_profile_tool.py", allow_abbrev=False,
+        prog="orca_profile_tool.py",
+        allow_abbrev=False,
         formatter_class=argparse.RawDescriptionHelpFormatter,
         description="Every maintenance job for the OrcaSlicer system profile tree.\n"
-                    "\n"
-                    "The ids it writes are pure functions of the profile's own\n"
-                    "identity, so it never invents one: it writes the id the rules\n"
-                    "already imply, and leaves a conforming tree alone.",
-        epilog=EXAMPLES)
+        "\n"
+        "The ids it writes are pure functions of the profile's own\n"
+        "identity, so it never invents one: it writes the id the rules\n"
+        "already imply, and leaves a conforming tree alone.",
+        epilog=EXAMPLES,
+    )
     commands = parser.add_subparsers(dest="command", metavar="<command>")
 
     def add(name, parents, help_text, description):
         return commands.add_parser(
-            name, parents=parents, help=help_text, description=description,
-            allow_abbrev=False, formatter_class=argparse.RawDescriptionHelpFormatter)
+            name,
+            parents=parents,
+            help=help_text,
+            description=description,
+            allow_abbrev=False,
+            formatter_class=argparse.RawDescriptionHelpFormatter,
+        )
 
     strict_opt = argparse.ArgumentParser(add_help=False)
-    strict_opt.add_argument("--strict", action="store_true",
-                            help="also hold every preset's inherited and included variant "
-                                 "arrays to its own width")
+    strict_opt.add_argument(
+        "--strict", action="store_true", help="also hold every preset's inherited and included variant arrays to its own width"
+    )
 
     add(
-        "check", [vendor_opt, strict_opt, profiles_opt],
+        "check",
+        [vendor_opt, strict_opt, profiles_opt],
         "validate the whole profile tree -- what CI runs",
         "Validate the whole profile tree: preset name uniqueness, index coverage\n"
         "both ways, compatible_printers, default-material references, obsolete,\n"
@@ -3691,9 +3785,12 @@ def build_parser():
         "\n"
         "--vendor narrows the per-vendor checks only: setting_id uniqueness and the\n"
         "filament_id state are cross-vendor properties a narrowed run cannot answer,\n"
-        "so they always cover the whole tree.")
+        "so they always cover the whole tree.",
+    )
 
-    add("fix-variant", [vendor_opt, strict_opt, dry_run_opt, profiles_opt],
+    add(
+        "fix-variant",
+        [vendor_opt, strict_opt, dry_run_opt, profiles_opt],
         "resize the variant arrays check rejects",
         "Resize every variant array that check reports as the wrong width\n"
         "in the selectable preset that writes it: extra values are dropped, missing\n"
@@ -3705,35 +3802,39 @@ def build_parser():
         "into the most general file on the way down to the preset that has the\n"
         "preset's width and whose presets all agree, else into the preset itself.\n"
         "Presets of every bundle count towards that agreement; --vendor limits the\n"
-        "files written.")
+        "files written.",
+    )
 
     generate_cmd = add(
-        "generate-id", [vendor_opt, dry_run_opt, profiles_opt],
+        "generate-id",
+        [vendor_opt, dry_run_opt, profiles_opt],
         "write the id each profile's identity implies",
         "Write the id every profile should carry: filament_id from each filament's\n"
         "(filament_vendor, filament_type, name) triple, setting_id from each preset's\n"
         "(vendor, type, name). Idempotent and byte-preserving.\n"
         "\n"
         "The id is a function of the triple alone, so a narrowed run writes exactly\n"
-        "what a full one would; check reports whatever it left outside.")
+        "what a full one would; check reports whatever it left outside.",
+    )
     which = generate_cmd.add_mutually_exclusive_group()
-    which.add_argument("--filament-id", action="store_true", dest="filament_id",
-                       help="write filament_id only, skipping setting_id")
-    which.add_argument("--setting-id", action="store_true", dest="setting_id",
-                       help="write setting_id only, skipping filament_id")
+    which.add_argument("--filament-id", action="store_true", dest="filament_id", help="write filament_id only, skipping setting_id")
+    which.add_argument("--setting-id", action="store_true", dest="setting_id", help="write setting_id only, skipping filament_id")
 
     normalize_cmd = add(
-        "normalize", [vendor_opt, type_opt, dry_run_opt, profiles_opt],
+        "normalize",
+        [vendor_opt, type_opt, dry_run_opt, profiles_opt],
         "rewrite profile files into their canonical shape",
-        "Add a missing \"type\", drop keys the slicer no longer reads, resolve the\n"
+        'Add a missing "type", drop keys the slicer no longer reads, resolve the\n'
         "extruder_clearance_* conflict, arrayify the filament options that are\n"
         "vectors, and rewrite each file with its identifying keys first.\n"
         "\n"
-        "Rewrites whole files, so it normalizes their formatting and key order too.")
-    normalize_cmd.add_argument("--force", action="store_true",
-                         help="rewrite every profile, not only the ones that changed")
+        "Rewrites whole files, so it normalizes their formatting and key order too.",
+    )
+    normalize_cmd.add_argument("--force", action="store_true", help="rewrite every profile, not only the ones that changed")
 
-    add("trim", [vendor_opt, type_opt, dry_run_opt, profiles_opt],
+    add(
+        "trim",
+        [vendor_opt, type_opt, dry_run_opt, profiles_opt],
         "delete profile files no <vendor>.json list references",
         "Delete profile files that a vendor's <vendor>.json does not index. The\n"
         "loader only ever reads the sub_paths listed there, so an unindexed preset\n"
@@ -3745,40 +3846,48 @@ def build_parser():
         "Assets and data files are kept, a file that cannot be parsed is kept and\n"
         "reported, and so is one a surviving profile inherits from that no indexed\n"
         "profile provides -- but a stale copy of an indexed profile goes, since\n"
-        "inherits resolves by name and the indexed one is what children get.")
+        "inherits resolves by name and the indexed one is what children get.",
+    )
 
-    add("update-index", [vendor_opt, type_opt, dry_run_opt, profiles_opt],
+    add(
+        "update-index",
+        [vendor_opt, type_opt, dry_run_opt, profiles_opt],
         "regenerate the *_list sections of <vendor>.json",
         "Rebuild the *_list sections of each <vendor>.json from the files on disk,\n"
         "ordered dependencies-first so the loader resolves inherits and include\n"
         "in one pass.\n"
         "\n"
-        "A profile is indexed under the section its own \"type\" names, so run\n"
+        'A profile is indexed under the section its own "type" names, so run\n'
         "normalize first: it is what writes a missing type. Two files claiming one\n"
         "preset name leave that index alone, because a rebuild could only keep one\n"
         "of them. Identify the intended preset and delete or rename the duplicate.\n"
         "Use trim only for deliberate unindexed-file cleanup, previewed with\n"
-        "--dry-run; it can also delete newly authored presets.")
+        "--dry-run; it can also delete newly authored presets.",
+    )
 
     legacy_cmd = add(
-        "legacy-compat", [profiles_opt],
+        "legacy-compat",
+        [profiles_opt],
         "write the printers user presets can be migrated back to",
         "Compare the tree with an older release's profiles and write, per filament\n"
         "preset of that release, the printers it covered then that the preset it now\n"
         "loads as no longer lists, where a preset with the same filament_id still\n"
         "covers them. The app offers to write these into user presets that inherit\n"
         "that preset by its old name and do not set compatible_printers, so a\n"
-        "narrowed list does not hide them on printers they were made for.")
-    legacy_cmd.add_argument("--base", required=True, metavar="DIR",
-                            help="the older release's resources/profiles directory")
-    legacy_cmd.add_argument("--output", default=LEGACY_COMPAT_PATH, metavar="FILE",
-                            help="map to write (default: resources/info/"
-                                 "legacy_compatible_printers.json)")
-    legacy_cmd.add_argument("--check", action="store_true",
-                            help="fail if the map differs from what --base implies; write nothing")
+        "narrowed list does not hide them on printers they were made for.",
+    )
+    legacy_cmd.add_argument("--base", required=True, metavar="DIR", help="the older release's resources/profiles directory")
+    legacy_cmd.add_argument(
+        "--output",
+        default=LEGACY_COMPAT_PATH,
+        metavar="FILE",
+        help="map to write (default: resources/info/legacy_compatible_printers.json)",
+    )
+    legacy_cmd.add_argument("--check", action="store_true", help="fail if the map differs from what --base implies; write nothing")
 
     gcode_cmd = add(
-        "gcode-diff", [vendor_opt, profiles_opt],
+        "gcode-diff",
+        [vendor_opt, profiles_opt],
         "print a readable markdown diff of changed custom G-code",
         "Print, as markdown, a unified diff of every G-code or other multi-line\n"
         "setting that differs between --base and --head in each changed profile\n"
@@ -3789,10 +3898,12 @@ def build_parser():
         "\n"
         "The settings are the *_gcode and multiline string options PrintConfig.cpp\n"
         "defines, the options Tab.cpp edits as code (such as filename_format), and any\n"
-        "string value that spans several lines.")
+        "string value that spans several lines.",
+    )
 
     version_cmd = add(
-        "version-check", [vendor_opt, profiles_opt],
+        "version-check",
+        [vendor_opt, profiles_opt],
         "fail unless every changed bundle's version was bumped",
         "Fail unless every vendor bundle with a file that differs between --base and\n"
         "--head (<Vendor>.json, or anything under <Vendor>/) has, at --head, a version\n"
@@ -3800,13 +3911,15 @@ def build_parser():
         "(MM.mm.pp.bb). A bundle --base does not have passes. The app installs a\n"
         "bundled profile only when its version is newer than the installed one, and\n"
         "the OTA profile update is named after it, so a change without a bump never\n"
-        "reaches users. CI runs it on profile PRs against the branch they merge into.")
+        "reaches users. CI runs it on profile PRs against the branch they merge into.",
+    )
     for cmd in (gcode_cmd, version_cmd):
-        cmd.add_argument("--base", metavar="REF",
-                         help="compare against this git ref (default: the merge base "
-                              "with upstream/main, else origin/main)")
-        cmd.add_argument("--head", metavar="REF",
-                         help="compare this git ref (default: the working tree)")
+        cmd.add_argument(
+            "--base",
+            metavar="REF",
+            help="compare against this git ref (default: the merge base with upstream/main, else origin/main)",
+        )
+        cmd.add_argument("--head", metavar="REF", help="compare this git ref (default: the working tree)")
 
     return parser
 
@@ -3838,8 +3951,7 @@ def main(argv=None):
         return 1 if errors else 0
 
     if args.command == "generate-id":
-        return run_generate_id(profiles_dir, vendors, args.filament_id, args.setting_id,
-                               args.dry_run)
+        return run_generate_id(profiles_dir, vendors, args.filament_id, args.setting_id, args.dry_run)
 
     if args.command == "legacy-compat":
         return run_legacy_compat(args.base, profiles_dir, args.output, args.check)
@@ -3851,17 +3963,13 @@ def main(argv=None):
         return run_version_check(profiles_dir, vendors, args.base, args.head)
 
     if args.command == "fix-variant":
-        _changed, errors = fix_variant_arrays(profiles_dir, vendors, dry_run=args.dry_run,
-                                               strict=args.strict)
+        _changed, errors = fix_variant_arrays(profiles_dir, vendors, dry_run=args.dry_run, strict=args.strict)
     elif args.command == "normalize":
-        _changed, errors = normalize_profiles(profiles_dir, vendors, profile_types,
-                                        force=args.force, dry_run=args.dry_run)
+        _changed, errors = normalize_profiles(profiles_dir, vendors, profile_types, force=args.force, dry_run=args.dry_run)
     elif args.command == "trim":
-        _removed, errors = trim_profiles(profiles_dir, vendors, profile_types,
-                                         dry_run=args.dry_run)
+        _removed, errors = trim_profiles(profiles_dir, vendors, profile_types, dry_run=args.dry_run)
     else:  # update-index
-        _changed, errors = update_profile_indexes(profiles_dir, vendors, profile_types,
-                                                  dry_run=args.dry_run)
+        _changed, errors = update_profile_indexes(profiles_dir, vendors, profile_types, dry_run=args.dry_run)
     return 1 if errors else 0
 
 

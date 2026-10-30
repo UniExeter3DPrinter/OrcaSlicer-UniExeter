@@ -86,9 +86,7 @@ class PresetTransactionDemo(orca.script.ScriptPluginCapabilityBase):
                 len(result.keys),
                 result.category,
                 result.target_name,
-                "it stays unsaved until you save it"
-                if result.dirty
-                else "it already matches its saved state",
+                "it stays unsaved until you save it" if result.dirty else "it already matches its saved state",
             )
         )
 

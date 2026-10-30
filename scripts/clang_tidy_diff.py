@@ -51,8 +51,8 @@ REMOVED_INCLUDE_RE = re.compile(r'^-\s*#\s*include\s*[<"]([^>"]+)[>"]')
 
 @dataclass
 class FileChange:
-    lines: list = field(default_factory=list)            # [first, last] ranges of added lines
-    removed_includes: set = field(default_factory=set)   # header names whose #include was deleted
+    lines: list = field(default_factory=list)  # [first, last] ranges of added lines
+    removed_includes: set = field(default_factory=set)  # header names whose #include was deleted
 
 
 @dataclass
@@ -62,7 +62,7 @@ class Diagnostic:
     col: int
     level: str
     message: str
-    include: str = ""   # header named by the fix, when the fix adds an #include
+    include: str = ""  # header named by the fix, when the fix adds an #include
 
     @property
     def is_compile_error(self):
@@ -107,9 +107,24 @@ def changed_files(merge_base):
     # Against the working tree, so a local run covers uncommitted edits too.
     # core.quotePath=false keeps a non-ASCII path unquoted, and the explicit prefixes
     # override diff.noprefix and diff.mnemonicPrefix, so parse_diff sees its b/ prefix.
-    diff = subprocess.run(["git", "-c", "core.quotePath=false", "diff", "-U0", "--no-color", "--no-ext-diff",
-                           "--src-prefix=a/", "--dst-prefix=b/", "--diff-filter=AMR", merge_base],
-                          check=True, capture_output=True, **UTF8).stdout
+    diff = subprocess.run(
+        [
+            "git",
+            "-c",
+            "core.quotePath=false",
+            "diff",
+            "-U0",
+            "--no-color",
+            "--no-ext-diff",
+            "--src-prefix=a/",
+            "--dst-prefix=b/",
+            "--diff-filter=AMR",
+            merge_base,
+        ],
+        check=True,
+        capture_output=True,
+        **UTF8,
+    ).stdout
     return {path: change for path, change in parse_diff(diff).items() if is_checked(path)}
 
 
@@ -124,8 +139,17 @@ def run_clang_tidy(clang_tidy, build_dir, path, lines, extra_args):
         fixes = os.path.join(tmp, "fixes.yaml")
         # The compile database comes from the system clang, which may know warning
         # flags a newer clang-tidy has dropped.
-        cmd = [clang_tidy, "-p", build_dir, "--quiet", "--export-fixes=" + fixes,
-               "--extra-arg=-Wno-unknown-warning-option", "--extra-arg=-ferror-limit=0", *extra_args, path]
+        cmd = [
+            clang_tidy,
+            "-p",
+            build_dir,
+            "--quiet",
+            "--export-fixes=" + fixes,
+            "--extra-arg=-Wno-unknown-warning-option",
+            "--extra-arg=-ferror-limit=0",
+            *extra_args,
+            path,
+        ]
         if lines is not None:
             # clang-tidy matches the name against the end of the file's native path.
             cmd.insert(1, "--line-filter=" + json.dumps([{"name": os.path.normpath(path), "lines": lines}]))
@@ -215,14 +239,15 @@ def check_file(clang_tidy, build_dir, merge_base, path, change, extra_args):
     # it never rewrites unrelated code, which for such a file means a second,
     # fixing run limited to the lines the first one found wanting.
     whole = bool(change.removed_includes)
-    returncode, output, diagnostics = run_clang_tidy(clang_tidy, build_dir, path,
-                                                     None if whole else change.lines,
-                                                     [] if whole else extra_args)
+    returncode, output, diagnostics = run_clang_tidy(
+        clang_tidy, build_dir, path, None if whole else change.lines, [] if whole else extra_args
+    )
     real = os.path.realpath(path)
 
     def introduced(d):
         return os.path.realpath(d.file) == real and (
-            in_ranges(d.line, change.lines) or names_removed_include(d.include, change.removed_includes))
+            in_ranges(d.line, change.lines) or names_removed_include(d.include, change.removed_includes)
+        )
 
     if PurePosixPath(path).suffix in HEADER_EXTENSIONS:
         # Many existing headers only compile after what their includers include
@@ -234,8 +259,7 @@ def check_file(clang_tidy, build_dir, merge_base, path, change, extra_args):
             with open(path, encoding="utf-8") as f:
                 text = f.read()
             before_sites = errors_alone_at(merge_base, clang_tidy, build_dir, path)
-            failing += [d for d in errors if d not in failing
-                        and (error_sites([d], text) - before_sites)]
+            failing += [d for d in errors if d not in failing and (error_sites([d], text) - before_sites)]
         failed = bool(failing)
     elif whole:
         failing = [d for d in diagnostics if d.is_compile_error or introduced(d)]
@@ -265,8 +289,7 @@ def main():
     # A piped stdout on Windows is cp1252, which cannot encode every character clang-tidy prints.
     sys.stdout.reconfigure(errors="replace")
 
-    merge_base = subprocess.run(["git", "merge-base", args.base, "HEAD"], check=True,
-                                capture_output=True, text=True).stdout.strip()
+    merge_base = subprocess.run(["git", "merge-base", args.base, "HEAD"], check=True, capture_output=True, text=True).stdout.strip()
     files = changed_files(merge_base)
     sources = compiled_sources(args.build_dir)
     todo = []
@@ -286,8 +309,10 @@ def main():
     failed = []
     fixed = []
     with ThreadPoolExecutor(max_workers=args.jobs) as pool:
-        jobs = {path: pool.submit(check_file, args.clang_tidy, args.build_dir, merge_base, path, change, args.extra_args)
-                for path, change in todo}
+        jobs = {
+            path: pool.submit(check_file, args.clang_tidy, args.build_dir, merge_base, path, change, args.extra_args)
+            for path, change in todo
+        }
         for path, job in jobs.items():
             file_failed, output, diagnostics, file_fixed = job.result()
             if file_fixed:
@@ -314,9 +339,11 @@ def main():
         print(f"\nclang-tidy still fails on {len(failed)} file(s); the findings above are what --fix could not fix.")
         return 1
     if failed:
-        print(f"\nclang-tidy failed on {len(failed)} file(s). Add the includes it names, or apply its "
-              "suggestions locally with scripts/run_clang_tidy.sh --fix (scripts\\run_clang_tidy.ps1 -Fix on Windows). "
-              "Other findings need a manual fix.")
+        print(
+            f"\nclang-tidy failed on {len(failed)} file(s). Add the includes it names, or apply its "
+            "suggestions locally with scripts/run_clang_tidy.sh --fix (scripts\\run_clang_tidy.ps1 -Fix on Windows). "
+            "Other findings need a manual fix."
+        )
         return 1
     print("clang-tidy passed.")
     return 0

@@ -15,19 +15,33 @@ import json
 import os
 import sys
 
-HERE = os.path.dirname(os.path.abspath(__file__))       # scripts/CAD
+HERE = os.path.dirname(os.path.abspath(__file__))  # scripts/CAD
 REPO = os.path.dirname(os.path.dirname(HERE))
 ATLAS = os.path.join(HERE, "tool_atlas.json")
 OUT = os.path.join(REPO, "src", "slic3r", "GUI", "CAD", "DesignOffer.hpp")
 
 # selection id -> C++ enumerator
 ENUM = {
-    "none": "None", "face_planar": "FacePlanar", "face_cyl": "FaceCyl",
-    "face_other": "FaceOther", "edge_str": "EdgeStr", "edge_circ": "EdgeCirc",
-    "vertex": "Vertex", "body_solid": "BodySolid", "body_sheet": "BodySheet",
-    "bodies_2": "Bodies2", "datum_plane": "DatumPlane", "datum_axis": "DatumAxis",
-    "coordsys": "CoordSys", "art": "Art", "sk_loop": "SkLoop", "sk_none": "SkNone",
-    "sk_line": "SkLine", "sk_arc": "SkArc", "sk_point": "SkPoint", "sk_2ent": "Sk2Ent",
+    "none": "None",
+    "face_planar": "FacePlanar",
+    "face_cyl": "FaceCyl",
+    "face_other": "FaceOther",
+    "edge_str": "EdgeStr",
+    "edge_circ": "EdgeCirc",
+    "vertex": "Vertex",
+    "body_solid": "BodySolid",
+    "body_sheet": "BodySheet",
+    "bodies_2": "Bodies2",
+    "datum_plane": "DatumPlane",
+    "datum_axis": "DatumAxis",
+    "coordsys": "CoordSys",
+    "art": "Art",
+    "sk_loop": "SkLoop",
+    "sk_none": "SkNone",
+    "sk_line": "SkLine",
+    "sk_arc": "SkArc",
+    "sk_point": "SkPoint",
+    "sk_2ent": "Sk2Ent",
 }
 
 
@@ -60,12 +74,12 @@ def validate(A):
     errs, seen = [], set()
     for v in A["verbs"]:
         if v["slot"] not in slot_ids:
-            errs.append(f'{v["id"]}: unknown slot {v["slot"]!r}')
+            errs.append(f"{v['id']}: unknown slot {v['slot']!r}")
         for a in v["accepts"]:
             if a not in sel_ids:
-                errs.append(f'{v["id"]}: accepts unknown selection {a!r}')
+                errs.append(f"{v['id']}: accepts unknown selection {a!r}")
         if v["id"] in seen:
-            errs.append(f'{v["id"]}: duplicate verb id')
+            errs.append(f"{v['id']}: duplicate verb id")
         seen.add(v["id"])
     for s in sel_ids - set(ENUM):
         errs.append(f"selection {s!r} has no OfferSel enumerator")
@@ -114,14 +128,14 @@ def main():
         "inline uint32_t offer_bit(OfferSel s) { return 1u << int(s); }",
         "",
         "// One row of the offer. `action` routes to the code that already implements the verb:",
-        '//   "key:S+E"        -> m_keys_feature[SHIFT(\'E\')]',
-        '//   "key:L"          -> m_keys_sketch[\'L\']',
+        "//   \"key:S+E\"        -> m_keys_feature[SHIFT('E')]",
+        "//   \"key:L\"          -> m_keys_sketch['L']",
         '//   "fly:material#4" -> row 4 of the "material" feature flyout',
         '//   "btn:delete"     -> a standalone toolbar button',
         "//   nullptr          -> kernel support exists, no GUI path yet (row shows disabled)",
         "struct OfferVerb {",
         "    const char* id;",
-        "    const char* name;        // drawing-office word (L10); msgctxt \"Design\", translated at use",
+        '    const char* name;        // drawing-office word (L10); msgctxt "Design", translated at use',
         "    int         row;         // index into kOfferRowNames, the ratified address — NEVER reorder",
         "    const char* key;         // shortcut shown in the row, or nullptr",
         "    const char* action;",
@@ -131,7 +145,7 @@ def main():
         "    int         need_sketches;",
         "    bool        need_sheet;",
         "    bool        sketch_mode; // belongs to the sketch-mode vocabulary, not the model one",
-        "    // Second level INSIDE a row, for tools that come in variants: \"Rectangle\" holds corner,",
+        '    // Second level INSIDE a row, for tools that come in variants: "Rectangle" holds corner,',
         "    // centre, oblique and rounded. nullptr = sits directly in the row. Keeps the row's own",
         "    // address fixed (L4.1) while the variants hang one level below it, mirroring the toolbar's",
         "    // grouping instead of flattening 19 create tools into one wall.",
@@ -145,7 +159,7 @@ def main():
     ]
     # A flat row's label is never shown, so it is not marked for translation.
     for s in A["slots"]:
-        lines.append(f'    {cstr(s["label"]) if s.get("flat") else tstr(s["label"])},')
+        lines.append(f"    {cstr(s['label']) if s.get('flat') else tstr(s['label'])},")
     lines += [
         "};",
         f"static const int kOfferRowCount = {len(slots)};",
@@ -154,7 +168,7 @@ def main():
         "static const bool kOfferRowFlat[] = {",
     ]
     for s in A["slots"]:
-        lines.append(f'    {"true" if s.get("flat") else "false"},')
+        lines.append(f"    {'true' if s.get('flat') else 'false'},")
     lines += [
         "};",
         "",
@@ -170,20 +184,31 @@ def main():
         # the next regeneration — which is how the model-mode "Constrain sketch" row came to exist
         # in the header and not in the atlas at all (ziam). The map exists once; so does
         # the explanation.
-        for ln in ([v["note"]] if isinstance(v.get("note"), str) else v.get("note") or []):
+        for ln in [v["note"]] if isinstance(v.get("note"), str) else v.get("note") or []:
             lines.append(f"    // {ln}")
         mask = 0
         for a in v["accepts"]:
             mask |= 1 << sels.index(a)
         n = v.get("needs") or {}
         lines.append(
-            "    {%s, %s, %d, %s, %s, %s, 0x%08xu, %d, %d, %s, %s, %s, %s, %s}," % (
-                cstr(v["id"]), tstr_design(v["name"]), slots.index(v["slot"]),
-                cstr(v.get("key")), cstr(v.get("action")), tstr(v.get("refusal")),
-                mask, n.get("bodies", 0), n.get("sketches", 0),
+            "    {%s, %s, %d, %s, %s, %s, 0x%08xu, %d, %d, %s, %s, %s, %s, %s},"
+            % (
+                cstr(v["id"]),
+                tstr_design(v["name"]),
+                slots.index(v["slot"]),
+                cstr(v.get("key")),
+                cstr(v.get("action")),
+                tstr(v.get("refusal")),
+                mask,
+                n.get("bodies", 0),
+                n.get("sketches", 0),
                 "true" if n.get("sheet") else "false",
                 "true" if v.get("mode") == "sketch" else "false",
-                tstr(v.get("family")), cstr(v.get("icon")), tstr(v.get("hint"))))
+                tstr(v.get("family")),
+                cstr(v.get("icon")),
+                tstr(v.get("hint")),
+            )
+        )
     lines += [
         "};",
         f"static const int kOfferVerbCount = {len(A['verbs'])};",
@@ -203,16 +228,15 @@ def main():
             print(f"{os.path.relpath(OUT, REPO)} matches tool_atlas.json")
             return 0
         import difflib
-        d = list(difflib.unified_diff(have.splitlines(), text.splitlines(),
-                                      "checked-in", "generated", lineterm="", n=1))
+
+        d = list(difflib.unified_diff(have.splitlines(), text.splitlines(), "checked-in", "generated", lineterm="", n=1))
         print(f"{os.path.relpath(OUT, REPO)} DIFFERS from tool_atlas.json:")
         print("\n".join(d[:60]))
         return 1
     with open(OUT, "w", encoding="utf-8") as f:
         f.write(text)
     wired = sum(1 for v in A["verbs"] if v.get("action"))
-    print(f"wrote {os.path.relpath(OUT, REPO)}: {len(A['verbs'])} verbs, "
-          f"{len(slots)} rows, {wired} wired to existing actions")
+    print(f"wrote {os.path.relpath(OUT, REPO)}: {len(A['verbs'])} verbs, {len(slots)} rows, {wired} wired to existing actions")
     return 0
 
 

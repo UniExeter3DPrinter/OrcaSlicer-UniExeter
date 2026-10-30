@@ -12,10 +12,10 @@
 """Interactive preset editor. Snapshots are read on the UI thread; edits run on execute's worker."""
 
 import queue
+
 import orca
 
-
-PAGE = r'''<!doctype html><html><head><meta charset="utf-8"><style>
+PAGE = r"""<!doctype html><html><head><meta charset="utf-8"><style>
 :root{color-scheme:light dark;--a:#087f78;--line:rgba(127,127,127,.25);--soft:rgba(127,127,127,.1)}
 *{box-sizing:border-box}body{margin:0;font:13px/1.45 var(--orca-font,system-ui,sans-serif);display:flex;flex-direction:column;height:100vh;color:var(--orca-fg,#20242a);background:var(--orca-bg,#fafafa)}
 header{padding:14px 18px;border-bottom:1px solid var(--line);display:flex;align-items:center;gap:12px}h1{font-size:16px;margin:0}.brand{color:var(--a);font-size:20px}select,input,textarea,button{font:inherit;color:inherit}select,input,textarea{background:var(--orca-bg,#fafafa);border:1px solid var(--line);border-radius:7px;padding:7px 9px}header select{margin-left:auto;min-width:140px}.bar{padding:10px 18px;display:flex;gap:10px;align-items:center;border-bottom:1px solid var(--line)}.bar select{min-width:220px}.bar label{font-size:11px;text-transform:uppercase;letter-spacing:.06em;opacity:.65}.badge{padding:3px 9px;border:1px solid var(--line);border-radius:20px;opacity:.7}.layout{display:grid;grid-template-columns:minmax(230px,42%) 1fr;min-height:0;flex:1}.list{border-right:1px solid var(--line);display:flex;flex-direction:column;min-height:0}.search{padding:9px;border-bottom:1px solid var(--line)}.search input{width:100%}#rows{overflow:auto;padding:4px}.row{width:100%;display:flex;gap:12px;padding:7px 9px;border:0;border-left:3px solid transparent;background:transparent;text-align:left;cursor:pointer;border-radius:3px}.row:hover,.row.sel{background:var(--soft)}.row.sel{border-left-color:var(--a)}.key{flex:1;font-family:ui-monospace,monospace;overflow:hidden;text-overflow:ellipsis}.val{max-width:45%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;opacity:.65;font-family:ui-monospace,monospace}.editor{padding:20px;display:flex;flex-direction:column;gap:10px;overflow:auto}.editor h2{font:600 15px ui-monospace,monospace;margin:0;overflow-wrap:anywhere}.muted{opacity:.65;font-size:11px;text-transform:uppercase;letter-spacing:.06em}.current{font-family:ui-monospace,monospace;background:var(--soft);padding:10px;border-radius:7px;overflow-wrap:anywhere;white-space:pre-wrap}textarea{min-height:88px;resize:vertical;font-family:ui-monospace,monospace}.actions{display:flex;gap:8px}button.action{padding:7px 15px;border-radius:7px;border:1px solid var(--line);background:transparent;cursor:pointer}button.primary{background:var(--a);border-color:var(--a);color:white}button:disabled{opacity:.45;cursor:default}.hint{margin-top:auto;padding:10px;border-left:3px solid var(--a);background:var(--soft);border-radius:4px}.status{padding:8px 18px;border-top:1px solid var(--line);opacity:.75}.error{color:#c33}.empty{padding:20px;opacity:.65}@media(max-width:650px){.layout{grid-template-columns:1fr 1fr}.bar{flex-wrap:wrap}.bar select{min-width:120px;flex:1}}
@@ -36,7 +36,7 @@ function paint(m){const notice=S.notice,noticeError=S.noticeError;S.notice='';S.
 function esc(x){return String(x??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
 $('kind').onchange=()=>{S.kind=$('kind').value;S.selected=null;$('preset').value='';load()};$('slot').onchange=()=>{S.slot=Number($('slot').value);S.selected=null;$('preset').value='';load()};$('preset').onchange=()=>{S.selected=null;load()};$('reload').onclick=load;$('close').onclick=()=>orca.close();$('search').oninput=()=>paint({kind:S.kind,slot:S.slot,rows:S.rows,presets:[...$('preset').options].map(o=>o.value),preset_name:$('preset').value});
 $('rows').onclick=e=>{let b=e.target.closest('[data-key]');if(!b)return;S.selected=b.dataset.key;let r=S.rows.find(x=>x.k===S.selected);$('key').textContent=r.k;$('current').textContent=r.v;$('value').value=r.v;$('value').disabled=false;$('reset').disabled=false;$('apply').disabled=false;document.querySelectorAll('.row').forEach(x=>x.classList.toggle('sel',x===b))};$('reset').onclick=()=>{let r=S.rows.find(x=>x.k===S.selected);if(r)$('value').value=r.v};$('apply').onclick=()=>send('apply',{key:S.selected,value:$('value').value});orca.onMessage(m=>{if(m.command==='state')paint(m);else if(m.command==='refresh'){S.notice=m.error||m.message||'';S.noticeError=!!m.error;load()}});load();
-</script></body></html>'''
+</script></body></html>"""
 
 
 class PresetUpdateDemo(orca.script.ScriptPluginCapabilityBase):
@@ -58,7 +58,10 @@ class PresetUpdateDemo(orca.script.ScriptPluginCapabilityBase):
             if self._cancelled:
                 return orca.ExecutionResult.success("Preset editor closed.")
             self.window = orca.host.ui.create_window(
-                title="Preset editor", html=PAGE, width=900, height=620,
+                title="Preset editor",
+                html=PAGE,
+                width=900,
+                height=620,
                 on_message=self._on_message,
                 on_close=self._on_close,
             )
@@ -73,8 +76,7 @@ class PresetUpdateDemo(orca.script.ScriptPluginCapabilityBase):
                 if self.window is not None and self.window.is_open():
                     self.window.post(notice)
         except Exception as error:
-            return orca.ExecutionResult.failure(orca.PluginResult.RecoverableError,
-                                                "Preset editor failed: %s" % error)
+            return orca.ExecutionResult.failure(orca.PluginResult.RecoverableError, "Preset editor failed: %s" % error)
         finally:
             if self._commands is commands:
                 self._commands = None
@@ -89,9 +91,17 @@ class PresetUpdateDemo(orca.script.ScriptPluginCapabilityBase):
         try:
             state = self._snapshot(message)
         except Exception as error:
-            state = {"command": "state", "kind": message.get("kind", "process"),
-                     "slot": message.get("slot", 1), "rows": [], "presets": [], "slots": [],
-                     "preset_name": "", "dirty": False, "error": str(error)}
+            state = {
+                "command": "state",
+                "kind": message.get("kind", "process"),
+                "slot": message.get("slot", 1),
+                "rows": [],
+                "presets": [],
+                "slots": [],
+                "preset_name": "",
+                "dirty": False,
+                "error": str(error),
+            }
         window = self.window
         if window is not None and window.is_open():
             window.post(state)
@@ -155,10 +165,10 @@ class PresetUpdateDemo(orca.script.ScriptPluginCapabilityBase):
         if kind == "filament":
             assigned_names = list(bundle.current_filament_preset_names())
             presets = list(bundle.current_filament_presets())
-            slots = [{"slot": index + 1,
-                      "name": presets[index].name if presets[index] is not None
-                              else (assigned_names[index] or None)}
-                     for index in range(len(presets))]
+            slots = [
+                {"slot": index + 1, "name": presets[index].name if presets[index] is not None else (assigned_names[index] or None)}
+                for index in range(len(presets))
+            ]
             if not 1 <= slot <= len(presets):
                 slot = 1
             preset = bundle.filaments.find_preset(requested) if requested else None
@@ -170,16 +180,22 @@ class PresetUpdateDemo(orca.script.ScriptPluginCapabilityBase):
             available = list(collection.preset_names())
             preset = collection.find_preset(requested) if requested else None
             if preset is None:
-                preset = (bundle.current_process_preset() if kind == "process"
-                          else bundle.current_printer_preset())
+                preset = bundle.current_process_preset() if kind == "process" else bundle.current_printer_preset()
         rows = []
         if preset is not None:
             for key in sorted(preset.config_keys()):
                 value = preset.config_value(key)
                 rows.append({"k": key, "v": "" if value is None else str(value)})
-        return {"command": "state", "kind": kind, "slot": slot, "slots": slots,
-                "presets": available, "preset_name": preset.name if preset is not None else "",
-                "dirty": bool(preset.is_dirty) if preset is not None else False, "rows": rows}
+        return {
+            "command": "state",
+            "kind": kind,
+            "slot": slot,
+            "slots": slots,
+            "presets": available,
+            "preset_name": preset.name if preset is not None else "",
+            "dirty": bool(preset.is_dirty) if preset is not None else False,
+            "rows": rows,
+        }
 
 
 @orca.plugin

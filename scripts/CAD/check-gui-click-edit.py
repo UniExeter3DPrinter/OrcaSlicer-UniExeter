@@ -32,21 +32,37 @@ With --attach it drives an already-running app instead of launching one; the app
 started with ORCA_CAD_UXTRACE=1 and its stderr redirected to --trace.
 Exit 0 = every field took what was typed.
 """
-import argparse, json, os, re, shutil, signal, socket, subprocess, sys, tempfile, time
+
+import argparse
+import json
+import os
+import re
+import shutil
+import signal
+import socket
+import subprocess
+import sys
+import tempfile
+import time
 
 AP = argparse.ArgumentParser()
 AP.add_argument("--display", default=os.environ.get("DISPLAY", ":10"))
 AP.add_argument("--bin", default="build/src/Release/orca-slicer")
 AP.add_argument("--datadir", default="")
 AP.add_argument("--trace", default="")
-AP.add_argument("--sock", default="/tmp/mcp-uxcheck.sock",
-                help="the app's MCP socket: the oracle for whether a sketch is really open")
+AP.add_argument(
+    "--sock", default="/tmp/mcp-uxcheck.sock", help="the app's MCP socket: the oracle for whether a sketch is really open"
+)
 AP.add_argument("--attach", action="store_true", help="drive a running app; do not launch one")
 AP.add_argument("--keep", action="store_true", help="leave the app running afterwards")
-AP.add_argument("--no-defocus", action="store_true",
-                help="do NOT take focus off the field before typing (weakens the gate; see below)")
-AP.add_argument("--seed-from", default=os.path.expanduser("~/.config/OrcaCAD/OrcaSlicer.conf"),
-                help="an existing OrcaSlicer.conf to copy presets/settings from")
+AP.add_argument(
+    "--no-defocus", action="store_true", help="do NOT take focus off the field before typing (weakens the gate; see below)"
+)
+AP.add_argument(
+    "--seed-from",
+    default=os.path.expanduser("~/.config/OrcaCAD/OrcaSlicer.conf"),
+    help="an existing OrcaSlicer.conf to copy presets/settings from",
+)
 A = AP.parse_args()
 
 DISP = A.display
@@ -67,8 +83,7 @@ def call(method, **params):
     s = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
     s.settimeout(30)
     s.connect(A.sock)
-    s.sendall((json.dumps({"jsonrpc": "2.0", "id": _n, "method": method,
-                           "params": params}) + "\n").encode())
+    s.sendall((json.dumps({"jsonrpc": "2.0", "id": _n, "method": method, "params": params}) + "\n").encode())
     buf = b""
     while b"\n" not in buf:
         d = s.recv(65536)
@@ -176,25 +191,32 @@ def launch():
     # the process was alive, `xdotool search` on the rig display found nothing, and the window
     # was sitting on the user's own screen. Silent, and it drives a stray app at someone's face.
     env.pop("WAYLAND_DISPLAY", None)
-    env.update(DISPLAY=DISP, GDK_BACKEND="x11", ORCA_CAD_UXTRACE="1",
-               LIBGL_ALWAYS_SOFTWARE="1", GALLIUM_DRIVER="llvmpipe",
-               # The rig's Xvfb has no input-method daemon, and a dead ibus context makes a
-               # GtkEntry drop every character while the app looks fine. It cannot affect the
-               # in-canvas field (ImGui needs no IM) but the app has other text fields, and a
-               # display full of IBUS warnings has cost a whole misdiagnosis before.
-               GTK_IM_MODULE="gtk-im-context-simple", XMODIFIERS="@im=none",
-               # The key tracer is this driver's only positive signal that a keystroke reached
-               # the Design panel at all. Without it "the field never opened" is indistinguishable
-               # from "we never got into sketch mode", and the first run of this ladder reported
-               # seven product failures that were really one driver racing a still-loading app.
-               ORCA_CAD_KEYTRACE="1", ORCA_CAD_MCP=A.sock,
-               SSL_CERT_FILE="/etc/ssl/certs/ca-certificates.crt",
-               WEBKIT_DISABLE_DMABUF_RENDERER="1", WEBKIT_DISABLE_COMPOSITING_MODE="1")
+    env.update(
+        DISPLAY=DISP,
+        GDK_BACKEND="x11",
+        ORCA_CAD_UXTRACE="1",
+        LIBGL_ALWAYS_SOFTWARE="1",
+        GALLIUM_DRIVER="llvmpipe",
+        # The rig's Xvfb has no input-method daemon, and a dead ibus context makes a
+        # GtkEntry drop every character while the app looks fine. It cannot affect the
+        # in-canvas field (ImGui needs no IM) but the app has other text fields, and a
+        # display full of IBUS warnings has cost a whole misdiagnosis before.
+        GTK_IM_MODULE="gtk-im-context-simple",
+        XMODIFIERS="@im=none",
+        # The key tracer is this driver's only positive signal that a keystroke reached
+        # the Design panel at all. Without it "the field never opened" is indistinguishable
+        # from "we never got into sketch mode", and the first run of this ladder reported
+        # seven product failures that were really one driver racing a still-loading app.
+        ORCA_CAD_KEYTRACE="1",
+        ORCA_CAD_MCP=A.sock,
+        SSL_CERT_FILE="/etc/ssl/certs/ca-certificates.crt",
+        WEBKIT_DISABLE_DMABUF_RENDERER="1",
+        WEBKIT_DISABLE_COMPOSITING_MODE="1",
+    )
     if os.path.exists(A.sock):
-        os.unlink(A.sock)          # a stale socket from a dead run answers nothing, slowly
+        os.unlink(A.sock)  # a stale socket from a dead run answers nothing, slowly
     log = open(TRACE, "wb")
-    _proc = subprocess.Popen([A.bin, "--datadir", datadir], env=env,
-                             stdout=subprocess.DEVNULL, stderr=log)
+    _proc = subprocess.Popen([A.bin, "--datadir", datadir], env=env, stdout=subprocess.DEVNULL, stderr=log)
     for _ in range(120):
         if win_id():
             return
@@ -230,20 +252,22 @@ def win_id():
     """
     if _proc is not None:
         for w in sh(f"DISPLAY={DISP} xdotool search --pid {_proc.pid} --onlyvisible --name '.'").split():
-            g = dict(l.split("=", 1) for l in
-                     sh(f"DISPLAY={DISP} xdotool getwindowgeometry --shell {w}").strip().splitlines()
-                     if "=" in l)
+            g = dict(
+                l.split("=", 1)
+                for l in sh(f"DISPLAY={DISP} xdotool getwindowgeometry --shell {w}").strip().splitlines()
+                if "=" in l
+            )
             if "WIDTH" in g and int(g["WIDTH"]) * int(g["HEIGHT"]) > 400 * 400:
                 return (w, int(g["X"]), int(g["Y"]), int(g["WIDTH"]), int(g["HEIGHT"]))
         return None
     best = None
     for w in sh(f"DISPLAY={DISP} xdotool search --onlyvisible --name '.'").split():
-        g = dict(l.split("=", 1) for l in
-                 sh(f"DISPLAY={DISP} xdotool getwindowgeometry --shell {w}").strip().splitlines()
-                 if "=" in l)
+        g = dict(
+            l.split("=", 1) for l in sh(f"DISPLAY={DISP} xdotool getwindowgeometry --shell {w}").strip().splitlines() if "=" in l
+        )
         if "WIDTH" not in g:
             continue
-        if not pid_alive(window_pid(w)):          # a ghost: no client is behind it any more
+        if not pid_alive(window_pid(w)):  # a ghost: no client is behind it any more
             continue
         a = int(g["WIDTH"]) * int(g["HEIGHT"])
         if a > 400 * 400 and (best is None or a > best[0]):
@@ -270,7 +294,7 @@ def win():
 
 def click(px, py, pause=0.5, btn=1):
     _, X, Y, _, _ = win()
-    xdo(f"mousemove {X+int(px)} {Y+int(py)} click --delay 120 {btn}")
+    xdo(f"mousemove {X + int(px)} {Y + int(py)} click --delay 120 {btn}")
     time.sleep(pause)
 
 
@@ -283,12 +307,12 @@ def visible_windows():
     """
     out = []
     for w in sh(f"DISPLAY={DISP} xdotool search --onlyvisible --name '.'").split():
-        g = dict(l.split("=", 1) for l in
-                 sh(f"DISPLAY={DISP} xdotool getwindowgeometry --shell {w}").strip().splitlines()
-                 if "=" in l)
+        g = dict(
+            l.split("=", 1) for l in sh(f"DISPLAY={DISP} xdotool getwindowgeometry --shell {w}").strip().splitlines() if "=" in l
+        )
         if "WIDTH" not in g:
             continue
-        if not pid_alive(window_pid(w)):   # see win_id(): a ghost cannot be closed, only ignored
+        if not pid_alive(window_pid(w)):  # see win_id(): a ghost cannot be closed, only ignored
             continue
         n = sh(f"DISPLAY={DISP} xdotool getwindowname {w}").strip()
         out.append((w, n, int(g["WIDTH"]), int(g["HEIGHT"])))
@@ -333,7 +357,7 @@ def dismiss_modals(timeout=30):
         extra = [x for x in visible_windows() if x[0] != keep and x[2] * x[3] < full * 0.5]
         if not extra:
             return
-        for (w, n, _, _) in extra:
+        for w, n, _, _ in extra:
             sh(f"DISPLAY={DISP} xdotool windowactivate {w}")
             time.sleep(0.4)
             key("Escape", 0.4)
@@ -341,10 +365,14 @@ def dismiss_modals(timeout=30):
                 sh(f"DISPLAY={DISP} xdotool windowclose {w}")
                 time.sleep(0.6)
         time.sleep(0.5)
-    left = [f"{n!r} ({w}x{h})" for (i, n, w, h) in visible_windows()
-            if i != keep and w * h < full * 0.5]
-    die("a modal is still covering the canvas after " + str(timeout) + "s: " + ", ".join(left) +
-        " — every drawing gesture would land in it, so nothing below this line could be trusted")
+    left = [f"{n!r} ({w}x{h})" for (i, n, w, h) in visible_windows() if i != keep and w * h < full * 0.5]
+    die(
+        "a modal is still covering the canvas after "
+        + str(timeout)
+        + "s: "
+        + ", ".join(left)
+        + " — every drawing gesture would land in it, so nothing below this line could be trusted"
+    )
 
 
 def dismiss_first_run():
@@ -353,9 +381,10 @@ def dismiss_first_run():
 
 # ---------------------------------------------------------------- the trace
 
+
 def trace_lines():
     try:
-        with open(TRACE, "r", errors="replace") as f:
+        with open(TRACE, errors="replace") as f:
             return [l.strip() for l in f if l.startswith("[UX] ")]
     except OSError:
         return []
@@ -375,6 +404,7 @@ def parse(line):
 
 
 # ---------------------------------------------------------------- grading
+
 
 def check(cond, what):
     """Returns the verdict so a caller can abandon a rung whose precondition failed."""
@@ -455,9 +485,11 @@ def type_into_open_field(value, mark):
         return trace_mark()
     typed = commits[-1][2].get("typed", "")
     got = commits[-1][2].get("value", "")
-    check(typed == str(value),
-          f"{title}: field received what was typed (typed={typed!r} wanted={value!r}"
-          f"{'  <-- it committed its PREFILL, so it never got the keyboard' if typed == prefill else ''})")
+    check(
+        typed == str(value),
+        f"{title}: field received what was typed (typed={typed!r} wanted={value!r}"
+        f"{'  <-- it committed its PREFILL, so it never got the keyboard' if typed == prefill else ''})",
+    )
     # A value that will not parse is a FAILED CHECK, never an exception. An unguarded float()
     # here met a locale-formatted "61,0000" and took the whole run down immediately after the
     # first check in the ladder's history had passed — the seven rungs below it were never tried
@@ -477,6 +509,7 @@ def type_into_open_field(value, mark):
 
 
 # ---------------------------------------------------------------- the ladder
+
 
 def enter_sketch(timeout=180):
     """Open a real sketch on a real plane, and PROVE it with the socket before drawing anything.
@@ -501,13 +534,13 @@ def enter_sketch(timeout=180):
     """
     deadline = time.time() + timeout
     while time.time() < deadline:
-        click(132, 53)                   # Design tab
+        click(132, 53)  # Design tab
         time.sleep(2.0)
         dismiss_modals()
-        key("shift+s", 1.0)              # nothing picked: the reference planes come up
-        click(*PLANE_PX, pause=0.8)      # picks the plane IN THE VIEWPORT: session open, offer up...
-        click(*PLANE_PX)                 # ...and this closes the offer
-        key("p", 0.6)                    # arms Point in the session
+        key("shift+s", 1.0)  # nothing picked: the reference planes come up
+        click(*PLANE_PX, pause=0.8)  # picks the plane IN THE VIEWPORT: session open, offer up...
+        click(*PLANE_PX)  # ...and this closes the offer
+        key("p", 0.6)  # arms Point in the session
         if try_call("sketch_describe") is not None:
             # NO Escape here. Every rung already opens with one to drop whatever tool the last
             # one left armed, and Escape in the Design tab walks a LIFO: first press drops the
@@ -516,8 +549,10 @@ def enter_sketch(timeout=180):
             # reported all eleven checks failed with "nothing opened" — the tools were arming
             # into an empty Feature-mode document.
             return
-    die("no sketch opened after Shift+S + plane click within "
-        f"{timeout}s — sketch_describe never answered on {A.sock} (trace {TRACE})")
+    die(
+        "no sketch opened after Shift+S + plane click within "
+        f"{timeout}s — sketch_describe never answered on {A.sock} (trace {TRACE})"
+    )
 
 
 # tool key, the clicks that draw it, and one distinct value per queued field. The values are
@@ -532,19 +567,19 @@ PLANE_PX = (913, 359)
 # window. Earlier values started at x=950, which is left of that box and also, on a fresh datadir,
 # underneath the "Bambu Network Plug-in Required" modal.
 TOOLS = [
-    ("L", "Line",      [(1030, 540), (1360, 540)],                         [61]),
-    ("R", "Rectangle", [(1030, 540), (1360, 730)],                         [62, 43]),
-    ("C", "Circle",    [(1180, 620), (1330, 620)],                         [64]),
-    ("S", "Slot",      [(1030, 580), (1300, 580), (1300, 640)],            [66]),
-    ("G", "Polygon",   [(1180, 620), (1320, 620)],                         [67]),
-    ("E", "Ellipse",   [(1180, 620), (1370, 620), (1180, 720)],            [68]),
-    ("A", "Arc",       [(1040, 660), (1340, 660), (1190, 560)],            [69]),
+    ("L", "Line", [(1030, 540), (1360, 540)], [61]),
+    ("R", "Rectangle", [(1030, 540), (1360, 730)], [62, 43]),
+    ("C", "Circle", [(1180, 620), (1330, 620)], [64]),
+    ("S", "Slot", [(1030, 580), (1300, 580), (1300, 640)], [66]),
+    ("G", "Polygon", [(1180, 620), (1320, 620)], [67]),
+    ("E", "Ellipse", [(1180, 620), (1370, 620), (1180, 720)], [68]),
+    ("A", "Arc", [(1040, 660), (1340, 660), (1190, 560)], [69]),
 ]
 
 
 def rung_tool(k, name, clicks, values):
     print(f"  {name}")
-    key("Escape", 0.6)                   # back to Select, whatever the last tool left armed
+    key("Escape", 0.6)  # back to Select, whatever the last tool left armed
     # Every rung re-establishes that a sketch is STILL open. One stray Escape too many leaves it,
     # and from then on every tool arms into a Feature-mode document that cannot open a value
     # field — which the checks below report as eleven independent product failures.
@@ -558,7 +593,7 @@ def rung_tool(k, name, clicks, values):
     # screen, open, and waiting. That message accused the product of the exact defect the ladder
     # exists to detect, from a bug in the ladder's own bookkeeping.
     mark = trace_mark()
-    for (x, y) in clicks:
+    for x, y in clicks:
         click(x, y)
     for v in values:
         mark = type_into_open_field(v, mark)
@@ -587,7 +622,9 @@ def rung_rounded_rect():
     if not check(tool == "rect_rounded", f"the rounded-rectangle tool armed (tool={tool!r})"):
         return
     mark = trace_mark()
-    click(1030, 540); click(1330, 700); click(1300, 660)   # corners, then the radius point
+    click(1030, 540)
+    click(1330, 700)
+    click(1300, 660)  # corners, then the radius point
     for v in (63, 41, 7):
         mark = type_into_open_field(v, mark)
 
@@ -607,18 +644,18 @@ def rung_label_click():
     click that opens a field; if none of them does, that is a real failure and it says so.
     """
     print("  label click-to-edit")
-    key("Escape", 0.6)                   # Select mode
+    key("Escape", 0.6)  # Select mode
     key("R", 0.8)
     click(1020, 530)
     click(1350, 740)
     time.sleep(1.5)
-    key("Escape", 0.8)                   # keep as drawn: abandon the queued value chain
+    key("Escape", 0.8)  # keep as drawn: abandon the queued value chain
     time.sleep(0.8)
-    key("Escape", 0.6)                   # back to Select so a click picks rather than draws
+    key("Escape", 0.6)  # back to Select so a click picks rather than draws
 
     mid_x, top_y = (1020 + 1350) // 2, 530
     candidates = [(mid_x, top_y + dy) for dy in (-26, -20, -14, -8, 0, 8, 14)]
-    for (cx, cy) in candidates:
+    for cx, cy in candidates:
         mark = trace_mark()
         click(cx, cy)
         deadline = time.time() + 2.0
@@ -628,8 +665,10 @@ def rung_label_click():
                 type_into_open_field(71, mark)
                 return
             time.sleep(0.2)
-    check(False, "clicking a dimension label reopened its value field "
-                 f"(tried {len(candidates)} points across the top edge at x={mid_x})")
+    check(
+        False,
+        f"clicking a dimension label reopened its value field (tried {len(candidates)} points across the top edge at x={mid_x})",
+    )
 
 
 def main():
@@ -642,7 +681,7 @@ def main():
     win()
     print(f"click-edit ladder on {DISP}, trace {TRACE}")
     enter_sketch()
-    for (k, name, clicks, values) in TOOLS:
+    for k, name, clicks, values in TOOLS:
         rung_tool(k, name, clicks, values)
     rung_rounded_rect()
     rung_label_click()

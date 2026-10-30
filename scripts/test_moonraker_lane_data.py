@@ -9,13 +9,13 @@ try:
     import requests
 except ImportError:
     requests = None  # only needed for live-printer operations, not --check-ofl-map
-import random
 import argparse
 import json
 import os
+import random
 import re
-import time
 import sys
+import time
 
 # Configuration
 DEFAULT_HOST = "192.168.88.9"
@@ -31,14 +31,15 @@ MATERIALS = ["PLA", "ABS", "PETG", "ASA", "ASA Sparkle", "TPU", ""]
 
 # Material default temperatures (None = use null)
 MATERIAL_TEMPS = {
-    "PLA":        {"nozzle": 210, "bed": 60},
-    "ABS":        {"nozzle": 240, "bed": 100},
-    "PETG":       {"nozzle": 235, "bed": 80},
-    "ASA":        {"nozzle": 245, "bed": 105},
-    "ASA Sparkle":{"nozzle": 245, "bed": 105},
-    "TPU":        {"nozzle": 220, "bed": 50},
-    "":           {"nozzle": None, "bed": None},
+    "PLA": {"nozzle": 210, "bed": 60},
+    "ABS": {"nozzle": 240, "bed": 100},
+    "PETG": {"nozzle": 235, "bed": 80},
+    "ASA": {"nozzle": 245, "bed": 105},
+    "ASA Sparkle": {"nozzle": 245, "bed": 105},
+    "TPU": {"nozzle": 220, "bed": 50},
+    "": {"nozzle": None, "bed": None},
 }
+
 
 def parse_cpp_type_map():
     """Extract the normalized-type -> OFL generic family table from MoonrakerPrinterAgent.cpp.
@@ -55,6 +56,7 @@ def parse_cpp_type_map():
     if not pairs:
         raise RuntimeError("type_to_ofl_family table parsed empty")
     return dict(pairs)
+
 
 def load_ofl_presets():
     """Map preset name -> parsed JSON for every OrcaFilamentLibrary filament profile."""
@@ -73,6 +75,7 @@ def load_ofl_presets():
                 presets[name] = data
     return presets
 
+
 def resolve_ofl_filament_id(presets, name):
     """Follow the inherits chain (within OFL) until a filament_id is declared."""
     seen = set()
@@ -86,6 +89,7 @@ def resolve_ofl_filament_id(presets, name):
             return fid
         name = preset.get("inherits")
     return None
+
 
 def check_ofl_generic_map():
     """Assert every material type the C++ normalization handles resolves to a shipped
@@ -111,8 +115,9 @@ def check_ofl_generic_map():
             errors.append(f"{preset_name}: no such OFL preset")
             continue
         if str(presets[preset_name].get("instantiation", "")).lower() != "true":
-            errors.append(f"{preset_name}: not instantiated — the C++ runtime lookup "
-                          f"only sees presets loaded into the PresetBundle")
+            errors.append(
+                f"{preset_name}: not instantiated — the C++ runtime lookup only sees presets loaded into the PresetBundle"
+            )
             continue
         fid = resolve_ofl_filament_id(presets, preset_name)
         if not fid:
@@ -125,9 +130,9 @@ def check_ofl_generic_map():
             print(f"  FAIL: {e}")
         print(f"OFL generic map check FAILED ({len(errors)} error(s))")
         return False
-    print(f"OFL generic map check passed: {len(type_map)} type aliases, "
-          f"{len(set(type_map.values()))} OFL generic presets\n")
+    print(f"OFL generic map check passed: {len(type_map)} type aliases, {len(set(type_map.values()))} OFL generic presets\n")
     return True
+
 
 def test_connection(host, port, api_key=None, verbose=False):
     """Test basic connectivity to Moonraker."""
@@ -155,34 +160,38 @@ def test_connection(host, port, api_key=None, verbose=False):
         print(f"  Connection error: {e}")
         return False
     except requests.exceptions.Timeout:
-        print(f"  Connection timed out")
+        print("  Connection timed out")
         return False
     except Exception as e:
         print(f"  Error: {type(e).__name__}: {e}")
         return False
 
+
 def hex_to_rgb(hex_color):
     """Convert hex color to RGB tuple."""
-    hex_color = hex_color.lstrip('#')
-    if hex_color.startswith('0x') or hex_color.startswith('0X'):
+    hex_color = hex_color.lstrip("#")
+    if hex_color.startswith("0x") or hex_color.startswith("0X"):
         hex_color = hex_color[2:]
     if len(hex_color) == 6:
-        return tuple(int(hex_color[i:i+2], 16) for i in (0, 2, 4))
+        return tuple(int(hex_color[i : i + 2], 16) for i in (0, 2, 4))
     return (128, 128, 128)  # Default gray
+
 
 def color_block(hex_color):
     """Return ANSI color block for terminal display."""
     r, g, b = hex_to_rgb(hex_color)
     return f"\033[48;2;{r};{g};{b}m    \033[0m"
 
+
 def random_color():
     """Generate random hex color, occasionally returning empty or '#None' like real data."""
     r = random.random()
     if r < 0.1:
-        return ""       # Empty color (empty lane)
+        return ""  # Empty color (empty lane)
     if r < 0.15:
         return "#None"  # Observed in real data for unknown colors
-    return "#{:06x}".format(random.randint(0, 0xFFFFFF))
+    return f"#{random.randint(0, 0xFFFFFF):06x}"
+
 
 def get_lane_data(host, port, api_key=None):
     """Fetch all lane data from Moonraker database."""
@@ -204,6 +213,7 @@ def get_lane_data(host, port, api_key=None):
         print(f"Error fetching lane data: {e}")
         return None
 
+
 def set_lane_data(host, port, lane_key, lane_data, api_key=None):
     """Set lane data in Moonraker database."""
     url = f"http://{host}:{port}/server/database/item"
@@ -211,11 +221,7 @@ def set_lane_data(host, port, lane_key, lane_data, api_key=None):
     if api_key:
         headers["X-Api-Key"] = api_key
 
-    payload = {
-        "namespace": NAMESPACE,
-        "key": lane_key,
-        "value": lane_data
-    }
+    payload = {"namespace": NAMESPACE, "key": lane_key, "value": lane_data}
 
     try:
         resp = requests.post(url, json=payload, headers=headers, timeout=5)
@@ -223,6 +229,7 @@ def set_lane_data(host, port, lane_key, lane_data, api_key=None):
     except Exception as e:
         print(f"Error setting lane data: {e}")
         return False
+
 
 def delete_lane_data(host, port, lane_key, api_key=None):
     """Delete lane data from Moonraker database."""
@@ -237,19 +244,19 @@ def delete_lane_data(host, port, lane_key, api_key=None):
         print(f"Error deleting lane data: {e}")
         return False
 
+
 def display_lanes(lanes):
     """Display lane data with color blocks."""
-    print("\n" + "="*70)
+    print("\n" + "=" * 70)
     print("CURRENT LANE DATA")
-    print("="*70)
+    print("=" * 70)
 
     if not lanes:
         print("  (no lanes configured)")
         return
 
     # Sort by lane number
-    sorted_lanes = sorted(lanes.items(),
-                          key=lambda x: int(x[1].get("lane", "0")) if x[1].get("lane", "").isdigit() else 0)
+    sorted_lanes = sorted(lanes.items(), key=lambda x: int(x[1].get("lane", "0")) if x[1].get("lane", "").isdigit() else 0)
 
     for lane_key, data in sorted_lanes:
         lane_num = data.get("lane", "?")
@@ -270,10 +277,13 @@ def display_lanes(lanes):
         spool_str = f"  Spool: {spool_id}" if spool_id is not None else ""
         color_str = color if color else "(none)"
 
-        print(f"  {lane_key} (T{lane_num}): {block} {color_str:10s}  {material:12s}  "
-              f"Nozzle: {noz_str:6s}  Bed: {bed_str:5s}{spool_str}")
+        print(
+            f"  {lane_key} (T{lane_num}): {block} {color_str:10s}  {material:12s}  "
+            f"Nozzle: {noz_str:6s}  Bed: {bed_str:5s}{spool_str}"
+        )
 
-    print("="*70 + "\n")
+    print("=" * 70 + "\n")
+
 
 def make_lane_entry(tool_number, material=None):
     """Generate a lane data entry matching real Moonraker AFC structure."""
@@ -302,6 +312,7 @@ def make_lane_entry(tool_number, material=None):
         "spool_id": spool_id,
     }
 
+
 def get_used_tool_numbers(host, port, api_key=None, exclude_key=None):
     """Get set of tool numbers currently in use."""
     lanes = get_lane_data(host, port, api_key) or {}
@@ -314,12 +325,14 @@ def get_used_tool_numbers(host, port, api_key=None, exclude_key=None):
             used.add(int(lane_val))
     return used
 
+
 def pick_available_tool_number(used_tool_numbers):
     """Pick a random tool number (0-7) not already in use. Returns None if all taken."""
     available = [n for n in range(8) if n not in used_tool_numbers]
     if not available:
         return None
     return random.choice(available)
+
 
 def fix_duplicate_lanes(host, port, lanes, api_key=None):
     """Detect and fix duplicate tool numbers in existing lane data.
@@ -374,12 +387,13 @@ def fix_duplicate_lanes(host, port, lanes, api_key=None):
     print()
     return lanes
 
+
 def perform_random_operations(host, port, api_key=None, num_ops=5):
     """Perform random insert/modify/delete operations."""
     operations = ["insert", "modify", "delete"]
 
     print(f"\nPerforming {num_ops} random operations...")
-    print("-"*50)
+    print("-" * 50)
 
     for i in range(num_ops):
         op = random.choice(operations)
@@ -405,8 +419,7 @@ def perform_random_operations(host, port, api_key=None, num_ops=5):
                 block = "    "
 
             if set_lane_data(host, port, lane_key, lane_data, api_key):
-                print(f"  [{action}] {lane_key} (T{tool}): {block} {color or '(none)'}  "
-                      f"{material}  spool={lane_data['spool_id']}")
+                print(f"  [{action}] {lane_key} (T{tool}): {block} {color or '(none)'}  {material}  spool={lane_data['spool_id']}")
             else:
                 print(f"  [{action}] {lane_key}: FAILED")
 
@@ -418,7 +431,8 @@ def perform_random_operations(host, port, api_key=None, num_ops=5):
 
         time.sleep(0.1)  # Small delay between operations
 
-    print("-"*50)
+    print("-" * 50)
+
 
 def load_lanes_from_file(filepath, host, port, api_key=None):
     """Load lane data from a JSON file and overwrite all lanes on the printer.
@@ -429,7 +443,7 @@ def load_lanes_from_file(filepath, host, port, api_key=None):
         {"lane1": {...}, "lane2": {...}, ...}
     """
     try:
-        with open(filepath, "r") as f:
+        with open(filepath) as f:
             data = json.load(f)
     except FileNotFoundError:
         print(f"Error: file not found: {filepath}")
@@ -486,28 +500,22 @@ def load_lanes_from_file(filepath, host, port, api_key=None):
 
     return ok
 
+
 def main():
-    parser = argparse.ArgumentParser(
-        description="Test Moonraker lane data for MoonrakerPrinterAgent filament sync"
-    )
-    parser.add_argument("--host", default=DEFAULT_HOST,
-                        help=f"Moonraker host (default: {DEFAULT_HOST})")
-    parser.add_argument("--port", type=int, default=DEFAULT_PORT,
-                        help=f"Moonraker port (default: {DEFAULT_PORT})")
+    parser = argparse.ArgumentParser(description="Test Moonraker lane data for MoonrakerPrinterAgent filament sync")
+    parser.add_argument("--host", default=DEFAULT_HOST, help=f"Moonraker host (default: {DEFAULT_HOST})")
+    parser.add_argument("--port", type=int, default=DEFAULT_PORT, help=f"Moonraker port (default: {DEFAULT_PORT})")
     parser.add_argument("--api-key", help="Moonraker API key (if required)")
-    parser.add_argument("--ops", type=int, default=5,
-                        help="Number of random operations (default: 5)")
-    parser.add_argument("--clear", action="store_true",
-                        help="Clear all lane data before starting")
-    parser.add_argument("--read-only", action="store_true",
-                        help="Only read and display current lane data")
-    parser.add_argument("--load", metavar="FILE",
-                        help="Load lane data from JSON file and overwrite printer lanes")
-    parser.add_argument("--check-ofl-map", action="store_true",
-                        help="Only run the offline check that the C++ generic-type map "
-                             "resolves against shipped OrcaFilamentLibrary presets")
-    parser.add_argument("--verbose", "-v", action="store_true",
-                        help="Verbose output for debugging")
+    parser.add_argument("--ops", type=int, default=5, help="Number of random operations (default: 5)")
+    parser.add_argument("--clear", action="store_true", help="Clear all lane data before starting")
+    parser.add_argument("--read-only", action="store_true", help="Only read and display current lane data")
+    parser.add_argument("--load", metavar="FILE", help="Load lane data from JSON file and overwrite printer lanes")
+    parser.add_argument(
+        "--check-ofl-map",
+        action="store_true",
+        help="Only run the offline check that the C++ generic-type map resolves against shipped OrcaFilamentLibrary presets",
+    )
+    parser.add_argument("--verbose", "-v", action="store_true", help="Verbose output for debugging")
 
     args = parser.parse_args()
 
@@ -531,7 +539,7 @@ def main():
         print(f"  1. Check if Moonraker is running on {args.host}")
         print(f"  2. Verify port {args.port} is correct (default Moonraker port is 7125)")
         print(f"  3. Try: curl http://{args.host}:{args.port}/server/info")
-        print(f"  4. Check if API key is required (--api-key)")
+        print("  4. Check if API key is required (--api-key)")
         return 1
 
     print("Connected!")
@@ -585,6 +593,7 @@ def main():
         print()
 
     return 0
+
 
 if __name__ == "__main__":
     exit(main())

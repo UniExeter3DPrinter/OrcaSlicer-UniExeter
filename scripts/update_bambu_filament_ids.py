@@ -45,13 +45,13 @@ for a human to read.
 """
 
 import argparse
+import datetime
 import json
 import os
 import shutil
 import subprocess
 import sys
 import tempfile
-import datetime
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from orca_profile_tool import (  # noqa: E402
@@ -76,9 +76,10 @@ BAMBUSTUDIO_REPO = "https://github.com/bambulab/BambuStudio"
 # Row derivation
 # ---------------------------------------------------------------------------
 
+
 def derive_rows(bs_filaments):
     """One row per BambuStudio product, keyed by the OF id its triple mints."""
-    by_filament = {}                       # filament_name -> (bambu_id, triple)
+    by_filament = {}  # filament_name -> (bambu_id, triple)
     for rec in bs_filaments.values():
         if not rec["instantiation"]:
             continue
@@ -89,22 +90,20 @@ def derive_rows(bs_filaments):
         triple = resolve_triple(rec["name"], bs_filaments, {})
         prev = by_filament.setdefault(filament_name, (bambu_id, triple))
         if prev != (bambu_id, triple):
-            raise SystemExit(f"BambuStudio filament {filament_name!r} is not one "
-                             f"product: {prev} vs {(bambu_id, triple)}")
+            raise SystemExit(f"BambuStudio filament {filament_name!r} is not one product: {prev} vs {(bambu_id, triple)}")
     rows, seen = {}, {}
     for filament_name, (bambu_id, triple) in sorted(by_filament.items()):
         if bambu_id in seen:
-            raise SystemExit(f"Bambu id {bambu_id} is shared by "
-                             f"{seen[bambu_id]!r} and {filament_name!r}")
+            raise SystemExit(f"Bambu id {bambu_id} is shared by {seen[bambu_id]!r} and {filament_name!r}")
         seen[bambu_id] = filament_name
-        rows[generate_filament_id(*triple)] = {
-            "bambu_id": bambu_id, "vendor": triple[0], "type": triple[1], "name": triple[2]}
+        rows[generate_filament_id(*triple)] = {"bambu_id": bambu_id, "vendor": triple[0], "type": triple[1], "name": triple[2]}
     return rows
 
 
 # ---------------------------------------------------------------------------
 # Drift report (informational only)
 # ---------------------------------------------------------------------------
+
 
 def drift_report(rows, orca_analysis):
     """Two triple-identity comparisons between the map just derived and Orca's
@@ -131,10 +130,8 @@ def drift_report(rows, orca_analysis):
 
     lines = []
     for triple in sorted(row_triples - set(orca_filaments.values())):
-        lines.append(f'upstream ships {triple[2]!r} ({triple[0]}/{triple[1]}), '
-                     "we ship nothing with that identity")
-    orca_only = [name for name, triple in orca_filaments.items()
-                 if triple not in row_triples]
+        lines.append(f"upstream ships {triple[2]!r} ({triple[0]}/{triple[1]}), we ship nothing with that identity")
+    orca_only = [name for name, triple in orca_filaments.items() if triple not in row_triples]
     lines.append(f"Orca BBL filaments with no row: {len(orca_only)} Orca-only product(s)")
     return lines
 
@@ -142,6 +139,7 @@ def drift_report(rows, orca_analysis):
 # ---------------------------------------------------------------------------
 # Map IO
 # ---------------------------------------------------------------------------
+
 
 def write_map(path, rows, commit, date):
     """Write the map: sorted keys, indent 2, LF, trailing newline."""
@@ -161,6 +159,7 @@ def write_map(path, rows, commit, date):
 # BambuStudio fetch
 # ---------------------------------------------------------------------------
 
+
 def run(command, cwd=None):
     """Run a command, streaming its output; raise SystemExit on failure."""
     print("+ " + " ".join(command))
@@ -175,23 +174,30 @@ def run_out(command, cwd=None):
     try:
         result = subprocess.run(command, cwd=cwd, check=True, capture_output=True, text=True)
     except subprocess.CalledProcessError as e:
-        raise SystemExit(
-            f"command failed ({e.returncode}): {' '.join(command)}\n{e.stderr}") from e
+        raise SystemExit(f"command failed ({e.returncode}): {' '.join(command)}\n{e.stderr}") from e
     return result.stdout.strip()
 
 
 def fetch_bambustudio(ref, workdir):
-    run(["git", "clone", "--depth=1", "--filter=blob:none", "--sparse", "--branch", ref,
-         BAMBUSTUDIO_REPO + ".git", workdir])
-    run(["git", "-C", workdir, "sparse-checkout", "set", "--no-cone",
-         "resources/profiles/BBL.json", "resources/profiles/BBL/filament"])
+    run(["git", "clone", "--depth=1", "--filter=blob:none", "--sparse", "--branch", ref, BAMBUSTUDIO_REPO + ".git", workdir])
+    run(
+        [
+            "git",
+            "-C",
+            workdir,
+            "sparse-checkout",
+            "set",
+            "--no-cone",
+            "resources/profiles/BBL.json",
+            "resources/profiles/BBL/filament",
+        ]
+    )
     return os.path.join(workdir, "resources", "profiles"), run_out(["git", "-C", workdir, "rev-parse", "--short", "HEAD"])
 
 
 def local_dir_commit(dir_path):
     """git rev-parse --short HEAD of dir_path, or "local" when it is not a repo."""
-    result = subprocess.run(["git", "-C", dir_path, "rev-parse", "--short", "HEAD"],
-                            capture_output=True, text=True)
+    result = subprocess.run(["git", "-C", dir_path, "rev-parse", "--short", "HEAD"], capture_output=True, text=True)
     return result.stdout.strip() if result.returncode == 0 else "local"
 
 
@@ -199,19 +205,23 @@ def local_dir_commit(dir_path):
 # CLI
 # ---------------------------------------------------------------------------
 
+
 def main(argv=None):
     parser = argparse.ArgumentParser(
-        description="Regenerate resources/printers/bambu_filament_ids.json from "
-                    "BambuStudio's shipped BBL bundle.")
+        description="Regenerate resources/printers/bambu_filament_ids.json from BambuStudio's shipped BBL bundle."
+    )
     source = parser.add_mutually_exclusive_group()
-    source.add_argument("--bambustudio-dir", metavar="DIR",
-                        help="a BambuStudio resources/profiles directory to read "
-                             "instead of cloning")
-    source.add_argument("--ref", default="master",
-                        help='BambuStudio git ref to shallow-clone when '
-                             '--bambustudio-dir is not given (default: "master")')
-    parser.add_argument("--output", default=BAMBU_MAP_PATH,
-                        help="output path (default: resources/printers/bambu_filament_ids.json)")
+    source.add_argument(
+        "--bambustudio-dir", metavar="DIR", help="a BambuStudio resources/profiles directory to read instead of cloning"
+    )
+    source.add_argument(
+        "--ref",
+        default="master",
+        help='BambuStudio git ref to shallow-clone when --bambustudio-dir is not given (default: "master")',
+    )
+    parser.add_argument(
+        "--output", default=BAMBU_MAP_PATH, help="output path (default: resources/printers/bambu_filament_ids.json)"
+    )
     args = parser.parse_args(argv)
 
     workdir = None

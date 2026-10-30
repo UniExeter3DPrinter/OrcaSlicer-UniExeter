@@ -18,6 +18,7 @@ change when the written value is the option's default in PrintConfig.cpp. Nor is
 that an include template does not pass on a key equal to the default. Reads
 scripts/orca_profile_tool.py.
 """
+
 import argparse
 import json
 import os
@@ -25,21 +26,34 @@ import sys
 from collections import Counter, defaultdict
 
 # The profile tool lives in <repo>/scripts; this file in <repo>/.claude/skills/orca-profiles/scripts.
-sys.path[:0] = [os.path.join(os.getcwd(), "scripts"),
-                os.path.join(os.path.dirname(os.path.abspath(__file__)), *[os.pardir] * 4, "scripts")]
+sys.path[:0] = [
+    os.path.join(os.getcwd(), "scripts"),
+    os.path.join(os.path.dirname(os.path.abspath(__file__)), *[os.pardir] * 4, "scripts"),
+]
 import orca_profile_tool as tool  # noqa: E402
 
 TYPES = ("machine", "process", "filament")
 # Keys the loader reads from each file as metadata; neither inherits nor include passes them on.
-PER_FILE = {"type", "name", "from", "instantiation", "setting_id", "renamed_from", "description",
-            "inherits", "include", "version", "url", "is_custom_defined"}
+PER_FILE = {
+    "type",
+    "name",
+    "from",
+    "instantiation",
+    "setting_id",
+    "renamed_from",
+    "description",
+    "inherits",
+    "include",
+    "version",
+    "url",
+    "is_custom_defined",
+}
 # Keys the app replaces with the selected presets' names before slicing: a file's value never counts.
 REPLACED = {"print_settings_id", "printer_settings_id", "filament_settings_id"}
 # What a restructure changes by design, or what never reaches a slice.
 MOVED_BY_DESIGN = {"inherits", "include"} | REPLACED
 # Keys that stay in their own file: metadata, identity, and each preset's compatibility.
-NEVER_SHARED = PER_FILE | REPLACED | {"filament_id", "compatible_printers", "compatible_prints",
-                                     "printer_variant", "printer_model"}
+NEVER_SHARED = PER_FILE | REPLACED | {"filament_id", "compatible_printers", "compatible_prints", "printer_variant", "printer_model"}
 
 
 class Tree:
@@ -101,10 +115,11 @@ class Tree:
 
 
 def snapshot(tree):
-    return {f"{vendor}/{ptype}/{name}": {k: v for k, v in tree.stored(vendor, ptype, name).items()
-                                        if k not in MOVED_BY_DESIGN}
-            for vendor, ptype, name, _rel, data in tree.presets()
-            if data.get("instantiation") == "true"}
+    return {
+        f"{vendor}/{ptype}/{name}": {k: v for k, v in tree.stored(vendor, ptype, name).items() if k not in MOVED_BY_DESIGN}
+        for vendor, ptype, name, _rel, data in tree.presets()
+        if data.get("instantiation") == "true"
+    }
 
 
 def compare(before, after):
@@ -117,9 +132,11 @@ def compare(before, after):
             continue
         for key in sorted(old.keys() | new.keys()):
             if key not in old or key not in new:
-                one_sided.append(f"{preset}: {key} "
-                                 f"{json.dumps(old[key]) if key in old else '(built-in default)'} -> "
-                                 f"{json.dumps(new[key]) if key in new else '(built-in default)'}")
+                one_sided.append(
+                    f"{preset}: {key} "
+                    f"{json.dumps(old[key]) if key in old else '(built-in default)'} -> "
+                    f"{json.dumps(new[key]) if key in new else '(built-in default)'}"
+                )
             elif old[key] != new[key]:
                 print(f"{preset}: {key} {json.dumps(old[key])} -> {json.dumps(new[key])}")
                 changed += 1
@@ -127,8 +144,10 @@ def compare(before, after):
         print(line)
     print(f"{changed} difference(s)")
     if one_sided:
-        print(f"{len(one_sided)} key(s) written on one side only: each is a difference unless the "
-              f"written value is the option's default in src/libslic3r/PrintConfig.cpp")
+        print(
+            f"{len(one_sided)} key(s) written on one side only: each is a difference unless the "
+            f"written value is the option's default in src/libslic3r/PrintConfig.cpp"
+        )
     return changed + len(one_sided)
 
 
@@ -143,9 +162,13 @@ def candidates(tree, vendor, ptypes, group_by):
         restated = {}
         for name, data in entries.items():
             restated[name] = sorted(
-                k for k in data if k not in NEVER_SHARED and k != list_key
+                k
+                for k in data
+                if k not in NEVER_SHARED
+                and k != list_key
                 and (data.get("inherits") or data.get("include"))
-                and tree.resize(ptype, tree.composed(vendor, ptype, name, drop=k)).get(k) == stored[name][k])
+                and tree.resize(ptype, tree.composed(vendor, ptype, name, drop=k)).get(k) == stored[name][k]
+            )
             if restated[name]:
                 print(f"{vendor}/{ptype} {name}: restates what it inherits: {', '.join(restated[name])}")
 
@@ -175,7 +198,8 @@ def candidates(tree, vendor, ptypes, group_by):
 
             def below(m):
                 """m and the files between it and the group's home."""
-                return [m] + chain[m][:chain[m].index(home)] if home in chain[m] else [m]
+                return [m] + chain[m][: chain[m].index(home)] if home in chain[m] else [m]
+
             shared, defaults = [], []
             for key in sorted(set().union(*(entries[m].keys() for m in members)) - NEVER_SHARED):
                 loaded = [json.dumps(stored[m].get(key)) for m in members]
@@ -191,12 +215,10 @@ def candidates(tree, vendor, ptypes, group_by):
                 # Balance 5: w presets drop their copy; a presets that take the key from the home
                 # (no file on their way to it writes it) and load another value must write theirs.
                 w = sum(key in entries[m] and v == top for m, v in zip(members, loaded))
-                a = sum(v != top and not any(key in entries[f] for f in below(m))
-                        for m, v in zip(members, loaded))
+                a = sum(v != top and not any(key in entries[f] for f in below(m)) for m, v in zip(members, loaded))
                 if w - a > 1:
                     shown = top if len(top) <= 40 else top[:37] + "..."
-                    defaults.append(f"{key} = {shown}: {held} load it, {w} write it, "
-                                    f"{a} would have to write their own")
+                    defaults.append(f"{key} = {shown}: {held} load it, {w} write it, {a} would have to write their own")
             if shared or defaults:
                 where = f"; nearest common base {common[0]}" if group_by and common else ""
                 title = f"{group_by} = {label}" if group_by else label
@@ -213,16 +235,20 @@ def candidates(tree, vendor, ptypes, group_by):
 def main():
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     profiles = argparse.ArgumentParser(add_help=False)
-    profiles.add_argument("--profiles", default=os.path.join("resources", "profiles"),
-                          help="profiles directory (default: resources/profiles)")
+    profiles.add_argument(
+        "--profiles", default=os.path.join("resources", "profiles"), help="profiles directory (default: resources/profiles)"
+    )
     sub = parser.add_subparsers(dest="command", required=True)
     sub.add_parser("snapshot", parents=[profiles]).add_argument("out")
     sub.add_parser("compare", parents=[profiles]).add_argument("before")
     cand = sub.add_parser("candidates", parents=[profiles])
     cand.add_argument("--vendor", required=True)
     cand.add_argument("--type", choices=TYPES, action="append")
-    cand.add_argument("--group-by", help="group selectable presets by this key's value instead of by "
-                      "base: printer_model, gcode_flavor, extruder_type, filament_id, layer_height, ...")
+    cand.add_argument(
+        "--group-by",
+        help="group selectable presets by this key's value instead of by "
+        "base: printer_model, gcode_flavor, extruder_type, filament_id, layer_height, ...",
+    )
     args = parser.parse_args()
     tree = Tree(args.profiles)
     if args.command == "snapshot":

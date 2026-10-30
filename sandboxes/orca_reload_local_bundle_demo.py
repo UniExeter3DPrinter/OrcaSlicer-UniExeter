@@ -16,7 +16,6 @@ import tempfile
 
 import orca
 
-
 BUNDLE_ID = "reload-local-bundle-demo"
 STATE_FILE = ".reload-local-bundle-demo-state.json"
 DEMO_PRESETS = (
@@ -84,9 +83,7 @@ def _state_path(bundle):
 
 def _write_json_atomic(path, value):
     os.makedirs(os.path.dirname(path), exist_ok=True)
-    descriptor, temporary = tempfile.mkstemp(
-        prefix="." + os.path.basename(path) + ".", suffix=".tmp", dir=os.path.dirname(path)
-    )
+    descriptor, temporary = tempfile.mkstemp(prefix="." + os.path.basename(path) + ".", suffix=".tmp", dir=os.path.dirname(path))
     try:
         with os.fdopen(descriptor, "w", encoding="utf-8") as stream:
             json.dump(value, stream, ensure_ascii=False, indent=2)
@@ -109,7 +106,7 @@ def _remove_file(path):
 
 def _read_state(bundle):
     try:
-        with open(_state_path(bundle), "r", encoding="utf-8") as stream:
+        with open(_state_path(bundle), encoding="utf-8") as stream:
             state = json.load(stream)
     except FileNotFoundError:
         return {"profiles": {}}
@@ -146,11 +143,7 @@ def _target_name(item):
 
 def _parent_name(bundle, item):
     collection = _collection(bundle, item)
-    own_names = {
-        _target_name(candidate)
-        for candidate in DEMO_PRESETS
-        if candidate["collection"] == item["collection"]
-    }
+    own_names = {_target_name(candidate) for candidate in DEMO_PRESETS if candidate["collection"] == item["collection"]}
     candidates = [collection.selected_preset()]
     candidates.extend(collection.preset(index) for index in range(collection.size()))
     for preset in candidates:
@@ -344,8 +337,12 @@ class ReloadLocalBundleDemo(orca.script.ScriptPluginCapabilityBase):
                 self._post_state()
                 return orca.ExecutionResult.success("Reload local bundle demo refreshed.")
             self.window = orca.host.ui.create_window(
-                title="Reload local bundle demo", html=PAGE, width=500, height=420,
-                on_message=self.on_message, on_close=self.on_close,
+                title="Reload local bundle demo",
+                html=PAGE,
+                width=500,
+                height=420,
+                on_message=self.on_message,
+                on_close=self.on_close,
             )
             return orca.ExecutionResult.success("Reload local bundle demo opened.")
         except Exception as error:

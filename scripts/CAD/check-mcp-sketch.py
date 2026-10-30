@@ -13,7 +13,11 @@ RUN IT AGAINST A RUNNING APP:
 
 Exit 0 = every assertion held. Anything else prints the first mismatch and stops.
 """
-import json, math, socket, sys
+
+import json
+import math
+import socket
+import sys
 
 SOCK = sys.argv[1] if len(sys.argv) > 1 else "/tmp/mcp.sock"
 _n = 0
@@ -25,8 +29,7 @@ def call(method, **params):
     s = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
     s.settimeout(30)
     s.connect(SOCK)
-    s.sendall((json.dumps({"jsonrpc": "2.0", "id": _n, "method": method,
-                           "params": params}) + "\n").encode())
+    s.sendall((json.dumps({"jsonrpc": "2.0", "id": _n, "method": method, "params": params}) + "\n").encode())
     buf = b""
     while b"\n" not in buf:
         d = s.recv(65536)
@@ -78,18 +81,20 @@ call("sketch_select", entities=[0, 1, 2, 3])
 call("sketch_offset", distance=5)
 r = call("sketch_describe")
 check(r["open_ends"] == [], "no open ends after the offset")
-check(any(near(l["area"], 70 * 40) for l in r["closed_loops"]),
-      f"the offset loop is 70x40 (got {areas(r)})")
+check(any(near(l["area"], 70 * 40) for l in r["closed_loops"]), f"the offset loop is 70x40 (got {areas(r)})")
 
 print("4. a gap is REPORTED with its coordinates, then healed into a constraint")
 call("sketch_cancel")
 call("sketch_begin", plane="XY")
-call("sketch_add", entities=[
-    {"type": "line", "p0": [0, 0], "p1": [60, 0]},
-    {"type": "line", "p0": [60, 0], "p1": [60, 40]},
-    {"type": "line", "p0": [60, 40], "p1": [0, 40]},
-    {"type": "line", "p0": [0, 40], "p1": [0.4, 0]},   # 0.4 mm short of closing
-])
+call(
+    "sketch_add",
+    entities=[
+        {"type": "line", "p0": [0, 0], "p1": [60, 0]},
+        {"type": "line", "p0": [60, 0], "p1": [60, 40]},
+        {"type": "line", "p0": [60, 40], "p1": [0, 40]},
+        {"type": "line", "p0": [0, 40], "p1": [0.4, 0]},  # 0.4 mm short of closing
+    ],
+)
 r = call("sketch_validate", tolerance=1.0)
 check(not r["buildable"], "a 0.4 mm gap makes the profile unbuildable")
 check(len(r["open_ends"]) == 2, f"both free ends are named (got {r['open_ends']})")
@@ -98,8 +103,7 @@ r = call("sketch_heal", tolerance=1.0)
 check(r["welded"] == 1, f"one pair welded (got {r['welded']})")
 check(r["buildable"] and r["open_ends"] == [], "healed profile is buildable")
 check(areas(r) == [2400.0], f"healed loop is 60x40 (got {areas(r)})")
-check(r["dof"] < dof_before,
-      f"the weld recorded a real constraint: DoF {dof_before} -> {r['dof']}")
+check(r["dof"] < dof_before, f"the weld recorded a real constraint: DoF {dof_before} -> {r['dof']}")
 
 print("5. construction geometry is excluded from the profile")
 call("sketch_select", entities=[0])
@@ -116,7 +120,7 @@ call("sketch_begin", plane="XY")
 call("sketch_add", rect=[0, 0, 60, 40])
 r = call("sketch_describe")
 check(areas(r) == [2400.0], f"one loop of 2400 mm^2 (got {areas(r)})")
-call("sketch_select", entities=[0])   # the bottom edge, y=0, from x=0 to x=60
+call("sketch_select", entities=[0])  # the bottom edge, y=0, from x=0 to x=60
 r = call("sketch_set_value", value=40)
 check(r["kind"] == "length", f"dimension kind is length (got {r['kind']})")
 check(near(r["before"], 60), f"the edge measured 60 before (got {r['before']})")
