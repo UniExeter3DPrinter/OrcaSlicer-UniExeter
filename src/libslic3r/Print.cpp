@@ -112,6 +112,9 @@
 #include "SurfaceCollection.hpp"
 #include "BeltBrim.hpp"
 
+#include "TransitionPostprocessor.hpp"
+#include "ToolpathIR.hpp"
+
 namespace fs = boost::filesystem;
 
 using namespace nlohmann;
@@ -4046,6 +4049,79 @@ std::string Print::export_gcode(const std::string& path_template, GCodeProcessor
     this->update_imex_slice_offset();
     const Vec2d imex_off = this->get_imex_slice_offset();
     gcode->set_gcode_offset_with_imex_shift(origin(0), origin(1), imex_off.x(), imex_off.y());
+
+    // ---- BEGIN PATCH: Transition postprocessor pipeline (Spec reference: ORCASLICER_IR_PLUGIN.md §3.2) ----
+    {
+        const DynamicPrintConfig &full_config = this->full_print_config();
+
+        if (full_config.opt_bool("transition_postprocessor_enabled")) {
+            const std::string pp_path =
+                full_config.opt_string("transition_postprocessor_path");
+            const std::string db_path =
+                full_config.opt_string("transition_database_path");
+
+            std::string temp_dir = boost::filesystem::path(path)
+                .parent_path().string();
+            std::string ir_export_path =
+                (boost::filesystem::path(temp_dir) / "toolpath_ir.json").string();
+
+            this->set_status(75, "Exporting toolpath IR...");
+
+            if (!export_toolpath_ir(m_objects, ir_export_path))
+                throw Slic3r::RuntimeError(
+                    "Toolpath IR export failed — could not write "
+                    + ir_export_path);
+
+            if (pp_path.empty()) {
+                // ---- EXPORT-ONLY / NULL TEST MODE ----
+                // No postprocessor path set — keep the IR file for inspection
+                // and proceed to normal G-code generation from unmodified data.
+                BOOST_LOG_TRIVIAL(info)
+                    << "Transition pipeline: export-only mode "
+                       "(no postprocessor path configured). "
+                       "IR written to " << ir_export_path;
+
+                this->set_status(80, message);
+                // File is NOT deleted — inspect it at ir_export_path
+
+            } else {
+                // ---- FULL PIPELINE MODE ----
+                if (db_path.empty())
+                    throw Slic3r::RuntimeError(
+                        "Material transition postprocessor is enabled but no "
+                        "database path is configured.");
+
+                MaterialAnnotationMap material_annotations;
+                run_transition_pipeline(
+                    m_objects,
+                    full_config,
+                    temp_dir,
+                    material_annotations
+                );
+
+                this->set_status(80, "Material transitions processed.");
+
+                if (!material_annotations.empty()) {
+                    gcode->set_material_annotations(
+                        std::move(material_annotations));
+
+                    std::unordered_map<std::string, int> slot_map;
+                    const auto *filament_diameters =
+                        full_config.option<ConfigOptionFloats>(
+                            "filament_diameter");
+                    if (filament_diameters) {
+                        for (int i = 0; i < static_cast<int>(
+                                filament_diameters->values.size()); ++i) {
+                            slot_map[std::to_string(i)] = i;
+                        }
+                    }
+                    gcode->set_material_slot_map(std::move(slot_map));
+                }
+            }
+        }
+    }
+    // ---- END PATCH ----
+
     gcode->do_export(this, path.c_str(), result, thumbnail_cb);
     gcode->export_layer_filaments(result);
     //BBS

@@ -8984,6 +8984,57 @@ void PrintConfigDef::init_fff_params()
                      "Otherwise, the rectilinear pattern will be used by default.");
     def->mode = comAdvanced;
     def->set_default_value(new ConfigOptionBool(true));
+
+    // ---- Material Transition Postprocessor (Spec reference: ORCASLICER_IR_PLUGIN.md §9.1) ----
+
+    def = this->add("transition_postprocessor_enabled", coBool);
+    def->label    = L("Enable material transition postprocessor");
+    def->tooltip  = L("When enabled, the slicer exports a toolpath IR file, "
+                       "runs an external postprocessor to compute material "
+                       "transitions, and re-imports the modified toolpath "
+                       "before G-code generation.");
+    def->category = L("Material Transitions");
+    def->mode     = comAdvanced;
+    def->set_default_value(new ConfigOptionBool(false));
+
+    def = this->add("transition_postprocessor_path", coString);
+    def->label    = L("Postprocessor executable path");
+    def->tooltip  = L("Absolute path to the transition postprocessor "
+                       "executable. Required when the postprocessor is enabled.");
+    def->category = L("Material Transitions");
+    def->mode     = comAdvanced;
+    def->set_default_value(new ConfigOptionString(""));
+
+    def = this->add("transition_database_path", coString);
+    def->label    = L("Transition database path");
+    def->tooltip  = L("Absolute path to the material transitions database "
+                       "file (.json). Contains transition parameters for "
+                       "material pairs.");
+    def->category = L("Material Transitions");
+    def->mode     = comAdvanced;
+    def->set_default_value(new ConfigOptionString(""));
+
+    def = this->add("transition_mode", coString);
+    def->label    = L("Transition mode");
+    def->tooltip  = L("\"blend\" uses sigmoid blending for smooth material "
+                       "transitions. \"purge\" uses traditional purge-tower "
+                       "or bucket purging as a fallback.");
+    def->category = L("Material Transitions");
+    def->mode     = comAdvanced;
+    def->set_default_value(new ConfigOptionString("blend"));
+
+    def = this->add("transition_postprocessor_timeout", coInt);
+    def->label    = L("Postprocessor timeout (seconds)");
+    def->tooltip  = L("Maximum time in seconds to wait for the postprocessor "
+                       "to complete. The slice is aborted if this limit is "
+                       "exceeded.");
+    def->category = L("Material Transitions");
+    def->mode     = comAdvanced;
+    def->min      = 10;
+    def->max      = 3600;
+    def->set_default_value(new ConfigOptionInt(300));
+
+
 }
 
 void PrintConfigDef::init_extruder_option_keys()

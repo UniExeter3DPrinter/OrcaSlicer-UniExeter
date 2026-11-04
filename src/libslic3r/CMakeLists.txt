@@ -560,6 +560,10 @@ set(lisbslic3r_sources
     TriangleSetSampling.hpp
     TriangulateWall.cpp
     TriangulateWall.hpp
+    ToolpathIR.cpp
+    TransitionPostprocessor.cpp
+    ToolpathIR.hpp
+    TransitionPostprocessor.hpp
     utils.cpp
     Utils.hpp
     VariableWidth.cpp

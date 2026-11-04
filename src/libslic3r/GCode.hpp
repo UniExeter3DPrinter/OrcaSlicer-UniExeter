@@ -53,6 +53,9 @@
 #include "Polyline.hpp"
 #include "BeltBrim.hpp"
 
+#include "ToolpathIR.hpp"      // MaterialAnnotation, MaterialAnnotationMap
+#include <unordered_map>
+
 namespace Slic3r { class ExtrusionEntityCollection; }
 
 namespace Slic3r {
@@ -406,6 +409,21 @@ public:
             return sum_z / count;
         }
     };
+
+    // Set the material annotation map after IR import completes,
+    // before do_export() is called (§6.3 lifecycle step 2).
+    void set_material_annotations(MaterialAnnotationMap &&annotations)
+    {
+        m_material_annotations = std::move(annotations);
+    }
+
+    // Set the material-to-slot mapping, built from PrintConfig's
+    // filament/extruder assignments during GCode initialisation (§6.2).
+    void set_material_slot_map(
+        std::unordered_map<std::string, int> &&slot_map)
+    {
+        m_material_to_slot = std::move(slot_map);
+    }
 
 protected:
     class GCodeOutputStream {
@@ -1046,6 +1064,49 @@ protected:
     friend class PressureEqualizer;
     friend class Print;
     friend class SmallAreaInfillFlowCompensator;
+
+private:
+    // ---- Material annotation emission (ORCASLICER_IR_PLUGIN.md §7) ----
+
+    // The annotation map — populated by import, consumed during process_layer.
+    // Keyed by raw ExtrusionEntity* (pointer stability guaranteed by §6.4).
+    MaterialAnnotationMap  m_material_annotations;
+
+    // Material-ID → hardware slot index (§6.2).
+    // Built once from PrintConfig filament assignments.
+    std::unordered_map<std::string, int>  m_material_to_slot;
+
+    // ---- Feed-state tracking (§7.2, §7.3) ----
+
+    // Last-emitted feed state — suppress redundant MATERIAL_FEED commands.
+    // Reset to empty at every layer boundary (§7.3).
+    std::map<std::string, double>  m_current_feed_state;
+
+    // ---- Temperature tracking (ORCASLICER_IR_TO_GCODE.md §5.5) ----
+
+    // Last-emitted nozzle temperature (°C). -1.0 = not yet emitted.
+    // Reset to -1.0 at every layer boundary (§5.5 rule 4).
+    double  m_current_nozzle_temp   = -1.0;
+
+    // Threshold (°C) above which M109 (blocking wait) is used instead of
+    // M104 (non-blocking). Default 15 °C per spec §5.5 rule 2.
+    double  m_temp_wait_threshold   = 15.0;
+
+    // Dead-band tolerance (°C). Temperature changes smaller than this are
+    // suppressed to avoid flooding firmware. Default 0.5 °C (§5.5 rule 3).
+    double  m_temp_deadband         = 0.5;
+
+    // ---- Emission functions ----
+
+    // Generic emission hook — called after standard extrusion G-code for
+    // each ExtrusionEntity. Emits temperature + feed commands when an
+    // annotation exists and state has changed (§7.1).
+    void emit_material_annotation(
+        const ExtrusionEntity  *entity,
+        std::string            &gcode_output);
+
+    // Reset feed and temperature state at layer boundaries (§7.3, §5.5 r4).
+    void reset_material_state_for_layer();
 };
 
 std::vector<const PrintInstance*> sort_object_instances_by_model_order(const Print& print, bool init_order = false);
