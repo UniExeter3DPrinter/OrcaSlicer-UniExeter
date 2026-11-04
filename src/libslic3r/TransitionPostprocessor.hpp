@@ -14,12 +14,14 @@
 #include <string>
 #include <vector>
 
+#include "ToolpathIR.hpp"
+#include "PrintConfig.hpp"    // for DynamicPrintConfig
+
+
 namespace Slic3r {
 
 // Forward declarations
 class PrintObject;
-class PrintConfig;
-struct MaterialAnnotationMap;
 
 // -------------------------------------------------------------------------
 // Result struct (§8.2)
@@ -68,7 +70,7 @@ TransitionPostprocessorResult run_transition_postprocessor(
 
 void run_transition_pipeline(
     std::vector<PrintObject*>  &objects,
-    const PrintConfig          &config,
+    const DynamicPrintConfig   &config,
     const std::string          &temp_dir,
     MaterialAnnotationMap      &annotations_out
 );

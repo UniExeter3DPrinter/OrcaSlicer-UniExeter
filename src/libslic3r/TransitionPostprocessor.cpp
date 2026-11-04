@@ -10,7 +10,7 @@
 #include "TransitionPostprocessor.hpp"
 #include "ToolpathIR.hpp"
 #include "PrintConfig.hpp"
-#include "PrintObject.hpp"
+#include "Print.hpp"
 #include "libslic3r.h"
 
 #include <boost/process.hpp>

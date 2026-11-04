@@ -9,7 +9,6 @@
 
 #include "ToolpathIR.hpp"
 
-#include "PrintObject.hpp"
 #include "Print.hpp"
 #include "Layer.hpp"
 #include "ExtrusionEntity.hpp"
