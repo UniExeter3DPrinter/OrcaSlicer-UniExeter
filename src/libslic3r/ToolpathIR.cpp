@@ -30,12 +30,8 @@ namespace Slic3r {
 // ExtrusionRole string mapping (§2.3)
 // =========================================================================
 //
-// NOTE: ExtrusionEntity has built-in static helpers role_to_string() and
-// string_to_role(). We maintain our own table here for two reasons:
-//   1. Our header declares these as public free functions
-//   2. Guarantees IR format stability even if OrcaSlicer's built-in
-//      strings change across versions
-// The values match the enum defined in ExtrusionEntity.hpp.
+// We maintain our own table for IR format stability even if OrcaSlicer's
+// built-in role_to_string() strings change across versions.
 
 static const std::pair<ExtrusionRole, const char*> s_role_names[] = {
     { erNone,                    "erNone"                    },
@@ -78,11 +74,9 @@ ExtrusionRole string_to_extrusion_role(const std::string &s)
 // ExtrusionLoopRole string mapping (§10.6)
 // =========================================================================
 //
-// NOTE: ExtrusionLoopRole is a bitmask enum (elrDefault=0x0, elrHole=0x1,
-// elrInternal=0x2, elrSkirt=0x4). In practice loops carry a single value,
-// but combined flags are possible. We serialise the raw integer alongside
-// the string for lossless round-tripping. Import reads "loop_role_raw"
-// (integer) first, falling back to the string if absent.
+// ExtrusionLoopRole is a bitmask enum (elrDefault=0x0, elrHole=0x1,
+// elrInternal=0x2, elrSkirt=0x4). We serialise the raw integer alongside
+// the string for lossless round-tripping.
 
 static const std::pair<ExtrusionLoopRole, const char*> s_loop_role_names[] = {
     { elrDefault,  "elrDefault"  },
@@ -105,7 +99,7 @@ ExtrusionLoopRole string_to_loop_role(const std::string &s)
     return elrDefault;
 }
 
-// FIXED: helper to deserialise loop role — prefers raw int, falls back to string
+// Helper: deserialise loop role — prefers raw int, falls back to string
 static ExtrusionLoopRole deserialise_loop_role(const json &j)
 {
     if (j.contains("loop_role_raw"))
@@ -122,7 +116,6 @@ static json serialise_points(const Polyline3 &polyline)
 {
     json pts = json::array();
     for (const Point3 &p : polyline.points) {
-        // FIXED: use unscale<double>() template form (verified in Point.hpp)
         pts.push_back({
             unscale<double>(p.x()),
             unscale<double>(p.y()),
@@ -138,15 +131,15 @@ static json serialise_path_fields(const ExtrusionPath &path)
     json j;
     j["role"]            = extrusion_role_to_string(path.role());
     j["mm3_per_mm"]      = path.mm3_per_mm;
-    j["width"]           = path.width;           // float
-    j["height"]          = path.height;          // float
-    j["overhang_degree"] = path.overhang_degree; // double
-    j["curve_degree"]    = path.curve_degree;    // int
-    j["smooth_speed"]    = path.smooth_speed;    // double
-    j["z_contoured"]     = path.z_contoured;     // bool
-    j["inset_idx"]       = path.inset_idx;       // int (on ExtrusionEntity base)
-    j["can_reverse"]     = path.can_reverse();   // getter for private m_can_reverse
-    j["no_extrusion"]    = path.is_force_no_extrusion(); // getter for private m_no_extrusion
+    j["width"]           = path.width;
+    j["height"]          = path.height;
+    j["overhang_degree"] = path.overhang_degree;
+    j["curve_degree"]    = path.curve_degree;
+    j["smooth_speed"]    = path.smooth_speed;
+    j["z_contoured"]     = path.z_contoured;
+    j["inset_idx"]       = path.inset_idx;
+    j["can_reverse"]     = path.can_reverse();
+    j["no_extrusion"]    = path.is_force_no_extrusion();
     j["points"]          = serialise_points(path.polyline);
 
     // Extension fields — null on export (§4.5)
@@ -159,12 +152,11 @@ static json serialise_path_fields(const ExtrusionPath &path)
     return j;
 }
 
-// FIXED: helper to serialise loop role — writes both string and raw int
-// for lossless bitmask round-tripping
+// Helper: serialise loop role — writes both string and raw int for bitmask safety
 static void serialise_loop_role(json &j, ExtrusionLoopRole role)
 {
-    j["loop_role"]     = loop_role_to_string(role);  // human readable
-    j["loop_role_raw"] = static_cast<int>(role);     // lossless bitmask
+    j["loop_role"]     = loop_role_to_string(role);
+    j["loop_role_raw"] = static_cast<int>(role);
 }
 
 // Serialise a single entity, dispatching by runtime type.
@@ -195,7 +187,7 @@ static json serialise_entity(const ExtrusionEntity *entity)
     if (auto *loop_sloped = dynamic_cast<const ExtrusionLoopSloped*>(entity)) {
         json j;
         j["type"] = "loop_sloped";
-        serialise_loop_role(j, loop_sloped->loop_role()); // FIXED: uses helper
+        serialise_loop_role(j, loop_sloped->loop_role());
         j["print_after_infill"] = loop_sloped->print_after_infill;
         j["inset_idx"]          = loop_sloped->inset_idx;
 
@@ -208,7 +200,7 @@ static json serialise_entity(const ExtrusionEntity *entity)
         }
         j["paths"] = std::move(paths);
 
-        // Sloped start/end vectors
+        // Sloped start vectors
         json starts = json::array();
         for (const ExtrusionPathSloped &sp : loop_sloped->starts) {
             json sj    = serialise_path_fields(sp);
@@ -221,6 +213,7 @@ static json serialise_entity(const ExtrusionEntity *entity)
         }
         j["starts"] = std::move(starts);
 
+        // Sloped end vectors
         json ends = json::array();
         for (const ExtrusionPathSloped &sp : loop_sloped->ends) {
             json ej    = serialise_path_fields(sp);
@@ -240,7 +233,7 @@ static json serialise_entity(const ExtrusionEntity *entity)
     if (auto *loop = dynamic_cast<const ExtrusionLoop*>(entity)) {
         json j;
         j["type"] = "loop";
-        serialise_loop_role(j, loop->loop_role()); // FIXED: uses helper
+        serialise_loop_role(j, loop->loop_role());
         j["print_after_infill"] = loop->print_after_infill;
         j["inset_idx"]          = loop->inset_idx;
 
@@ -335,10 +328,6 @@ bool export_toolpath_ir(
         j_obj["object_id"] = static_cast<int>(obj_idx);
 
         // ------ Object layers (§4.3) ------
-        // NOTE: layer->id(), region_count(), get_region(), print_z, height,
-        //       slice_z, region().extruder() — to be verified against
-        //       Layer.hpp. If any cause compile errors, see the
-        //       verification checklist (Layer access patterns).
         json j_layers = json::array();
         for (const Layer *layer : obj->layers()) {
             json j_layer;
@@ -352,7 +341,8 @@ bool export_toolpath_ir(
                 const LayerRegion *region = layer->get_region(r);
                 json j_region;
                 j_region["region_idx"]  = static_cast<int>(r);
-                j_region["extruder_id"] = region->region().extruder(FlowRole::frExternalPerimeter);
+                // FIXED: FlowRole is unscoped enum — no FlowRole:: prefix
+                j_region["extruder_id"] = region->region().extruder(frExternalPerimeter);
                 j_region["perimeters"]  = serialise_collection(region->perimeters);
                 j_region["fills"]       = serialise_collection(region->fills);
                 j_region["thin_fills"]  = serialise_collection(region->thin_fills);
@@ -398,8 +388,6 @@ static Polyline3 deserialise_points(const json &j_points)
     Polyline3 poly;
     poly.points.reserve(j_points.size());
     for (const auto &pt : j_points) {
-        // FIXED: Point3 is Vec3crd (Eigen::Matrix<coord_t,3,1>).
-        // Eigen .x()/.y()/.z() return references, so assignment works.
         Point3 p;
         p.x() = scale_(pt[0].get<double>());
         p.y() = scale_(pt[1].get<double>());
@@ -410,10 +398,14 @@ static Polyline3 deserialise_points(const json &j_points)
 }
 
 // Populate common path fields from JSON into an existing ExtrusionPath (§5.1)
+//
+// Verified against ExtrusionEntity.hpp:
+//   - set_extrusion_role(ExtrusionRole) — public setter for m_role
+//   - set_reverse() — sets m_can_reverse = false (no bool setter exists)
+//   - set_force_no_extrusion(bool) — public setter for m_no_extrusion
+//   - All other fields are public members
 static void deserialise_path_fields(const json &j, ExtrusionPath &path)
 {
-    // FIXED: setter is set_extrusion_role(), not set_role()
-    // (verified: ExtrusionEntity.hpp has set_extrusion_role(ExtrusionRole))
     path.set_extrusion_role(string_to_extrusion_role(j.at("role").get<std::string>()));
 
     path.mm3_per_mm      = j.at("mm3_per_mm").get<double>();
@@ -425,15 +417,55 @@ static void deserialise_path_fields(const json &j, ExtrusionPath &path)
     path.z_contoured     = j.at("z_contoured").get<bool>();
     path.inset_idx       = j.at("inset_idx").get<int>();
 
-    // FIXED: no set_can_reverse(bool) setter exists.
-    // set_reverse() sets m_can_reverse = false (one-way).
-    // Default-constructed paths have m_can_reverse = true,
-    // so only call set_reverse() when the JSON says false.
+    // m_can_reverse defaults to true in the default ctor.
+    // set_reverse() sets it to false — there's no set_can_reverse(bool).
     if (!j.at("can_reverse").get<bool>())
         path.set_reverse();
 
     path.set_force_no_extrusion(j.at("no_extrusion").get<bool>());
     path.polyline = deserialise_points(j.at("points"));
+}
+
+// Helper: build an ExtrusionPathSloped from JSON.
+// Verified: ExtrusionPathSloped has no default ctor.
+// Available ctors:
+//   (const ExtrusionPath&, const Slope&, const Slope&)
+//   (ExtrusionPath&&, const Slope&, const Slope&)
+//   (const Polyline3&, const ExtrusionPath&, const Slope&, const Slope&)
+//   (Polyline3&&, const ExtrusionPath&, const Slope&, const Slope&)
+static ExtrusionPathSloped* deserialise_path_sloped(const json &j)
+{
+    ExtrusionPath base;
+    deserialise_path_fields(j, base);
+
+    ExtrusionPathSloped::Slope begin{
+        j.at("slope_begin").at("z_ratio").get<double>(),
+        j.at("slope_begin").at("e_ratio").get<double>()
+    };
+    ExtrusionPathSloped::Slope end{
+        j.at("slope_end").at("z_ratio").get<double>(),
+        j.at("slope_end").at("e_ratio").get<double>()
+    };
+
+    return new ExtrusionPathSloped(std::move(base), begin, end);
+}
+
+// Helper: build an ExtrusionPathSloped value (not heap) for starts/ends vectors.
+static ExtrusionPathSloped deserialise_path_sloped_value(const json &j)
+{
+    ExtrusionPath base;
+    deserialise_path_fields(j, base);
+
+    ExtrusionPathSloped::Slope begin{
+        j.at("slope_begin").at("z_ratio").get<double>(),
+        j.at("slope_begin").at("e_ratio").get<double>()
+    };
+    ExtrusionPathSloped::Slope end{
+        j.at("slope_end").at("z_ratio").get<double>(),
+        j.at("slope_end").at("e_ratio").get<double>()
+    };
+
+    return ExtrusionPathSloped(std::move(base), begin, end);
 }
 
 // Extract MaterialAnnotation from extension fields if any are non-null (§6.3).
@@ -487,15 +519,18 @@ static ExtrusionEntity* deserialise_entity(const json &j,
     }
 
     // --- loop_sloped ---
+    // Verified: ExtrusionLoopSloped has NO default ctor and NO
+    // import-friendly ctor. Its only ctor recomputes slopes from
+    // raw paths (scarf seam logic).
+    //
+    // WORKAROUND: We add a minimal ctor to ExtrusionEntity.hpp:
+    //   ExtrusionLoopSloped(ExtrusionLoopRole role = elrDefault)
+    //       : ExtrusionLoop(role) {}
+    // This is the ONLY header change required for the IR import.
+    // See the patch note below the file.
     if (type == "loop_sloped") {
-        // FIXED: construct with loop role from JSON directly.
-        // If ExtrusionLoopSloped(ExtrusionLoopRole) ctor doesn't exist,
-        // change to: auto *loop = new ExtrusionLoopSloped();
-        //            loop->m_loop_role = deserialise_loop_role(j);
-        // or use whatever setter the class provides.
         ExtrusionLoopRole lr = deserialise_loop_role(j);
-        auto *loop = new ExtrusionLoopSloped();
-        loop->set_loop_role(lr);
+        auto *loop = new ExtrusionLoopSloped(lr);
         loop->print_after_infill = j.at("print_after_infill").get<bool>();
         loop->inset_idx          = j.at("inset_idx").get<int>();
 
@@ -506,36 +541,22 @@ static ExtrusionEntity* deserialise_entity(const json &j,
             loop->paths.push_back(std::move(p));
         }
 
-        // Sloped starts
-        for (const auto &sj : j.at("starts")) {
-            ExtrusionPathSloped sp;
-            deserialise_path_fields(sj, sp);
-            sp.slope_begin.z_ratio = sj.at("slope_begin").at("z_ratio").get<double>();
-            sp.slope_begin.e_ratio = sj.at("slope_begin").at("e_ratio").get<double>();
-            sp.slope_end.z_ratio   = sj.at("slope_end").at("z_ratio").get<double>();
-            sp.slope_end.e_ratio   = sj.at("slope_end").at("e_ratio").get<double>();
-            loop->starts.push_back(std::move(sp));
-        }
+        // Sloped starts — push by value (vector<ExtrusionPathSloped>)
+        for (const auto &sj : j.at("starts"))
+            loop->starts.push_back(deserialise_path_sloped_value(sj));
 
         // Sloped ends
-        for (const auto &ej : j.at("ends")) {
-            ExtrusionPathSloped sp;
-            deserialise_path_fields(ej, sp);
-            sp.slope_begin.z_ratio = ej.at("slope_begin").at("z_ratio").get<double>();
-            sp.slope_begin.e_ratio = ej.at("slope_begin").at("e_ratio").get<double>();
-            sp.slope_end.z_ratio   = ej.at("slope_end").at("z_ratio").get<double>();
-            sp.slope_end.e_ratio   = ej.at("slope_end").at("e_ratio").get<double>();
-            loop->ends.push_back(std::move(sp));
-        }
+        for (const auto &ej : j.at("ends"))
+            loop->ends.push_back(deserialise_path_sloped_value(ej));
 
         return loop;
     }
 
     // --- loop ---
+    // Verified: ExtrusionLoop(ExtrusionLoopRole role = elrDefault) exists.
     if (type == "loop") {
         ExtrusionLoopRole lr = deserialise_loop_role(j);
-        auto *loop = new ExtrusionLoop();
-        loop->set_loop_role(lr);
+        auto *loop = new ExtrusionLoop(lr);
         loop->print_after_infill = j.at("print_after_infill").get<bool>();
         loop->inset_idx          = j.at("inset_idx").get<int>();
 
@@ -549,12 +570,12 @@ static ExtrusionEntity* deserialise_entity(const json &j,
     }
 
     // --- multipath ---
+    // Verified: ExtrusionMultiPath() default ctor exists.
+    // m_can_reverse defaults to true; set_reverse() flips it to false.
     if (type == "multipath") {
         auto *mp = new ExtrusionMultiPath();
         mp->inset_idx = j.at("inset_idx").get<int>();
 
-        // FIXED: same pattern as ExtrusionPath — no set_can_reverse(bool).
-        // Default is true; call set_reverse() only when JSON says false.
         if (!j.at("can_reverse").get<bool>())
             mp->set_reverse();
 
@@ -568,13 +589,9 @@ static ExtrusionEntity* deserialise_entity(const json &j,
     }
 
     // --- path_sloped ---
+    // Verified: no default ctor. Use helper that builds from base path + slopes.
     if (type == "path_sloped") {
-        auto *ps = new ExtrusionPathSloped();
-        deserialise_path_fields(j, *ps);
-        ps->slope_begin.z_ratio = j.at("slope_begin").at("z_ratio").get<double>();
-        ps->slope_begin.e_ratio = j.at("slope_begin").at("e_ratio").get<double>();
-        ps->slope_end.z_ratio   = j.at("slope_end").at("z_ratio").get<double>();
-        ps->slope_end.e_ratio   = j.at("slope_end").at("e_ratio").get<double>();
+        auto *ps = deserialise_path_sloped(j);
 
         MaterialAnnotation ann;
         if (extract_annotation(j, ann))
@@ -584,12 +601,18 @@ static ExtrusionEntity* deserialise_entity(const json &j,
     }
 
     // --- path_contoured ---
+    // Verified ctor: (Polyline3&&, const ExtrusionPath&, vector<double>&&)
     if (type == "path_contoured") {
-        auto *pc = new ExtrusionPathContoured();
-        deserialise_path_fields(j, *pc);
+        ExtrusionPath base;
+        deserialise_path_fields(j, base);
 
+        std::vector<double> z_diffs;
         for (const auto &zd : j.at("z_diffs"))
-            pc->z_diffs.push_back(zd.get<double>());
+            z_diffs.push_back(zd.get<double>());
+
+        // Ctor takes polyline by move, base by const ref (copies fields), z_diffs by move
+        auto *pc = new ExtrusionPathContoured(
+            std::move(base.polyline), base, std::move(z_diffs));
 
         MaterialAnnotation ann;
         if (extract_annotation(j, ann))
@@ -599,8 +622,10 @@ static ExtrusionEntity* deserialise_entity(const json &j,
     }
 
     // --- path_oriented ---
+    // Verified ctor: (ExtrusionRole, double mm3_per_mm, float width, float height)
+    // Construct with placeholder values, then overwrite via deserialise_path_fields.
     if (type == "path_oriented") {
-        auto *po = new ExtrusionPathOriented();
+        auto *po = new ExtrusionPathOriented(erNone, -1, -1, -1);
         deserialise_path_fields(j, *po);
 
         MaterialAnnotation ann;
@@ -611,6 +636,7 @@ static ExtrusionEntity* deserialise_entity(const json &j,
     }
 
     // --- path (base leaf) ---
+    // Verified: ExtrusionPath() default ctor exists.
     if (type == "path") {
         auto *p = new ExtrusionPath();
         deserialise_path_fields(j, *p);
