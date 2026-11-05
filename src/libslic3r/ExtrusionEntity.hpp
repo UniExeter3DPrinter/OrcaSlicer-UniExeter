@@ -561,6 +561,9 @@ public:
     std::vector<ExtrusionPathSloped> starts;
     std::vector<ExtrusionPathSloped> ends;
 
+    // import/reconstruction constructor for ToolpathIR
+    ExtrusionLoopSloped(ExtrusionLoopRole role = elrDefault) : ExtrusionLoop(role) {}
+
     ExtrusionLoopSloped(ExtrusionPaths& original_paths,
                         double          seam_gap,
                         double          slope_min_length,

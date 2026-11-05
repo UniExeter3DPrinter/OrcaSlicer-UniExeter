@@ -137,6 +137,25 @@ enum InfillPattern : int {
     ipCount,
 };
 
+enum class TransitionMode : uint8_t {
+    Blend,      // Sigmoid blending — the novel contribution (§9.2)
+    Purge       // Traditional purge-tower/bucket fallback
+};
+
+// Convenience helpers for converting between the config string and the enum
+inline TransitionMode transition_mode_from_string(const std::string &s) {
+    if (s == "purge") return TransitionMode::Purge;
+    return TransitionMode::Blend;  // default
+}
+
+inline const char* transition_mode_to_string(TransitionMode mode) {
+    switch (mode) {
+        case TransitionMode::Purge: return "purge";
+        default:                    return "blend";
+    }
+}
+
+
 // Orca: Infill patterns that the "separated_infills" option can center on each connected body.
 inline bool is_separable_infill_pattern(InfillPattern pattern)
 {

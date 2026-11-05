@@ -93,6 +93,7 @@
 #include <unordered_set>
 #include <sstream>
 #include <boost/filesystem/path.hpp>
+#include <boost/filesystem/operations.hpp>   // for boost::filesystem::file_size()
 #include <boost/format.hpp>
 #include <boost/log/trivial.hpp>
 #include <boost/regex.hpp>
@@ -111,6 +112,9 @@
 #include "PlaceholderParser.hpp"
 #include "SurfaceCollection.hpp"
 #include "BeltBrim.hpp"
+
+#include "TransitionPostprocessor.hpp"
+#include "ToolpathIR.hpp"
 
 namespace fs = boost::filesystem;
 
@@ -4046,6 +4050,135 @@ std::string Print::export_gcode(const std::string& path_template, GCodeProcessor
     this->update_imex_slice_offset();
     const Vec2d imex_off = this->get_imex_slice_offset();
     gcode->set_gcode_offset_with_imex_shift(origin(0), origin(1), imex_off.x(), imex_off.y());
+
+
+    // ---- BEGIN PATCH: Transition postprocessor pipeline (Spec reference: ORCASLICER_IR_PLUGIN.md §3.2) ----
+    {
+        const DynamicPrintConfig &full_config = this->full_print_config();
+
+        if (full_config.opt_bool("transition_postprocessor_enabled")) {
+            auto safe_opt_string = [&](const char* key) -> std::string {
+                const auto* opt = full_config.option<ConfigOptionString>(key);
+                return opt ? opt->value : std::string();
+            };
+            auto safe_opt_int = [&](const char* key, int fallback) -> int {
+                const auto* opt = full_config.option<ConfigOptionInt>(key);
+                return opt ? opt->value : fallback;
+            };
+
+            // ── Read all transition config values ────────────────────
+            const std::string pp_path    = safe_opt_string("transition_postprocessor_path");
+            const std::string db_path    = safe_opt_string("transition_database_path");
+            const std::string tp_mode    = safe_opt_string("transition_mode");
+            const int         tp_timeout = safe_opt_int("transition_postprocessor_timeout", 120);
+
+            // ── Start timer ──────────────────────────────────────────
+            auto pipeline_start = std::chrono::steady_clock::now();
+
+            BOOST_LOG_TRIVIAL(info)
+                << "Transition pipeline: enabled"
+                << " (mode=" << (tp_mode.empty() ? "sigmoid" : tp_mode)
+                << ", path=" << (pp_path.empty() ? "none" : pp_path) << ")";
+
+            std::string temp_dir = boost::filesystem::path(path)
+                .parent_path().string();
+            std::string ir_export_path =
+                (boost::filesystem::path(temp_dir) / "toolpath_ir.json").string();
+
+            this->set_status(75, "Exporting toolpath IR...");
+
+            // ── Count layers and moves for logging ───────────────────
+            size_t total_layers = 0;
+            size_t total_moves  = 0;
+            for (const PrintObject *obj : m_objects) {
+                total_layers += obj->layers().size();
+                for (const Layer *layer : obj->layers()) {
+                    for (const LayerRegion *region : layer->regions()) {
+                        total_moves += region->perimeters.entities.size();
+                        total_moves += region->fills.entities.size();
+                    }
+                }
+            }
+
+            BOOST_LOG_TRIVIAL(info)
+                << "Transition pipeline: exporting IR for "
+                << total_layers << " layers, " << total_moves << " moves";
+
+            if (!export_toolpath_ir(m_objects, ir_export_path))
+                throw Slic3r::RuntimeError(
+                    "Toolpath IR export failed — could not write "
+                    + ir_export_path);
+
+            // ── Log file size ────────────────────────────────────────
+            uintmax_t file_size_bytes = boost::filesystem::file_size(ir_export_path);
+            uintmax_t file_size_kb    = file_size_bytes / 1024;
+
+            BOOST_LOG_TRIVIAL(info)
+                << "Transition pipeline: IR written to " << ir_export_path
+                << " (" << file_size_kb << " KB)";
+
+            if (pp_path.empty()) {
+                // ---- EXPORT-ONLY / NULL TEST MODE ----
+                // No postprocessor path set — keep the IR file for inspection
+                // and proceed to normal G-code generation from unmodified data.
+                BOOST_LOG_TRIVIAL(info)
+                    << "Transition pipeline: export-only mode "
+                       "(no postprocessor path configured).";
+
+                this->set_status(80, "Toolpath IR exported (export-only mode).");
+                // File is NOT deleted — inspect it at ir_export_path
+
+            } else {
+                // ---- FULL PIPELINE MODE ----
+                if (db_path.empty())
+                    throw Slic3r::RuntimeError(
+                        "Material transition postprocessor is enabled but no "
+                        "database path is configured.");
+
+                BOOST_LOG_TRIVIAL(info)
+                    << "Transition pipeline: invoking " << pp_path
+                    << " (timeout=" << tp_timeout << "s)";
+
+                MaterialAnnotationMap material_annotations;
+                run_transition_pipeline(
+                    m_objects,
+                    full_config,
+                    temp_dir,
+                    material_annotations
+                );
+
+                this->set_status(80, "Material transitions processed.");
+
+                if (!material_annotations.empty()) {
+                    gcode->set_material_annotations(
+                        std::move(material_annotations));
+
+                    std::unordered_map<std::string, int> slot_map;
+                    const auto *filament_diameters =
+                        full_config.option<ConfigOptionFloats>(
+                            "filament_diameter");
+                    if (filament_diameters) {
+                        for (int i = 0; i < static_cast<int>(
+                                filament_diameters->values.size()); ++i) {
+                            slot_map[std::to_string(i)] = i;
+                        }
+                    }
+                    gcode->set_material_slot_map(std::move(slot_map));
+                }
+            }
+
+            // ── Elapsed time ─────────────────────────────────────────
+            auto pipeline_end = std::chrono::steady_clock::now();
+            auto elapsed_ms = std::chrono::duration_cast<std::chrono::milliseconds>(
+                pipeline_end - pipeline_start).count();
+
+            BOOST_LOG_TRIVIAL(info)
+                << "Transition pipeline: complete (" << elapsed_ms << " ms)";
+        }
+    }
+    // ---- END PATCH ----
+
+
     gcode->do_export(this, path.c_str(), result, thumbnail_cb);
     gcode->export_layer_filaments(result);
     //BBS

@@ -130,6 +130,11 @@
 #include <Shiny/Shiny.h>
 #include <stdio.h>
 
+#include "ToolpathIR.hpp"
+#include <cmath>       // std::abs
+#include <sstream>     // std::ostringstream for temp formatting
+#include <iomanip>     // std::fixed, std::setprecision
+#include <stdexcept>   // std::out_of_range for slot lookup
 
 using namespace std::literals::string_view_literals;
 
@@ -6617,6 +6622,9 @@ LayerResult GCode::process_layer(
     // Either printing all copies of all objects, or just a single copy of a single object.
     assert(single_object_instance_idx == size_t(-1) || layers.size() == 1);
 
+    // --- PATCH: reset material state at layer boundary ---
+    reset_material_state_for_layer();
+
     // First object, support and raft layer, if available.
     const Layer         *object_layer  = nullptr;
     const SupportLayer  *support_layer = nullptr;
@@ -8870,6 +8878,10 @@ std::string GCode::extrude_multi_path(const ExtrusionMultiPath& multipath, const
 
     for (const ExtrusionPath &path : multipath.paths){
         gcode += this->_extrude(path, description, speed);
+
+        // --- PATCH: per-sub-path material annotation ---
+        this->emit_material_annotation(&path, gcode);
+
         // Orca: Adaptive PA - dont adapt PA after the first pultipath extrusion is completed
         // as we have already set the PA value to the average flow over the totality of the path
         // in the first extrude move.
@@ -8889,15 +8901,21 @@ std::string GCode::extrude_entity(const ExtrusionEntity&                     ent
                                   const std::vector<const ExtrusionEntity*>& region_perimeters,
                                   const WipeInwardSupport*                   wipe_support)
 {
+    std::string gcode;
+
     if (const ExtrusionPath* path = dynamic_cast<const ExtrusionPath*>(&entity))
-        return this->extrude_path(*path, description, speed);
+        gcode = this->extrude_path(*path, description, speed);
     else if (const ExtrusionMultiPath* multipath = dynamic_cast<const ExtrusionMultiPath*>(&entity))
-        return this->extrude_multi_path(*multipath, description, speed);
+        gcode = this->extrude_multi_path(*multipath, description, speed);
     else if (const ExtrusionLoop* loop = dynamic_cast<const ExtrusionLoop*>(&entity))
-        return this->extrude_loop(*loop, description, speed, region_perimeters, nullptr, wipe_support);
+        gcode = this->extrude_loop(*loop, description, speed, region_perimeters, nullptr, wipe_support);
     else
         throw Slic3r::InvalidArgument("Invalid argument supplied to extrude()");
-    return "";
+
+    // --- PATCH: emit material annotation after entity extrusion ---
+    this->emit_material_annotation(&entity, gcode);
+
+    return gcode;
 }
 
 std::string GCode::extrude_path(const ExtrusionPath& path, const std::string& description, double speed)
@@ -11663,6 +11681,165 @@ void GCode::ObjectByExtruder::Island::Region::append(const Type type, const Extr
 
 // Index into std::vector<LayerToPrint>, which contains Object and Support layers for the current print_z, collected for
 // a single object, or for possibly multiple objects with multiple instances.
+
+
+// =========================================================================
+// Helper: format temperature to one decimal place (avoids trailing zeros
+// from std::to_string which gives 6 decimal places)
+// =========================================================================
+static std::string temp_str(double temp)
+{
+    std::ostringstream oss;
+    oss << std::fixed << std::setprecision(1) << temp;
+    return oss.str();
+}
+
+// =========================================================================
+// Helper: format feed fraction to 6 decimal places
+// =========================================================================
+static std::string fraction_str(double fraction)
+{
+    std::ostringstream oss;
+    oss << std::fixed << std::setprecision(6) << fraction;
+    return oss.str();
+}
+
+
+// =========================================================================
+// GCode::reset_material_state_for_layer()
+//
+// Called at the start of each layer in process_layer().
+// Forces the first annotated path of each layer to emit both temperature
+// and feed commands, ensuring firmware state is correct even if layers
+// are processed out of order or the printer resumes mid-print.
+//
+// Spec: ORCASLICER_IR_PLUGIN.md §7.3, ORCASLICER_IR_TO_GCODE.md §5.5 r4
+// =========================================================================
+void GCode::reset_material_state_for_layer()
+{
+    m_current_feed_state.clear();
+    m_current_nozzle_temp = -1.0;
+}
+
+
+// =========================================================================
+// GCode::emit_material_annotation()
+//
+// Generic emission hook — called after standard extrusion G-code (G1 X Y
+// E F) for each ExtrusionEntity. Checks the annotation map and emits
+// temperature and material-feed G-code commands when state has changed.
+//
+// Ordering (§5.5 rule 5): temperature commands BEFORE feed commands.
+// This gives the heater a head-start on ramping while the material blend
+// changes.
+//
+// Spec: ORCASLICER_IR_PLUGIN.md §7.1, ORCASLICER_IR_TO_GCODE.md §5
+// =========================================================================
+void GCode::emit_material_annotation(
+    const ExtrusionEntity  *entity,
+    std::string            &gcode_output)
+{
+    // ---- Step 1: Look up annotation ----
+
+    auto it = m_material_annotations.find(entity);
+    if (it == m_material_annotations.end())
+        return;  // No annotation — standard path, nothing to emit
+
+    const MaterialAnnotation &ann = it->second;
+
+    // ---- Step 2: Temperature emission (§5.5) ----
+    //
+    // Rules:
+    //   1. Non-blocking (M104) by default
+    //   2. Blocking (M109) when delta > m_temp_wait_threshold
+    //   3. Suppress when delta < m_temp_deadband
+    //   4. Layer-boundary reset handled by reset_material_state_for_layer()
+
+    if (ann.nozzle_temp > 0.0) {
+        double delta = std::abs(ann.nozzle_temp - m_current_nozzle_temp);
+
+        if (delta > m_temp_deadband) {
+            if (delta > m_temp_wait_threshold) {
+                // Large temperature jump — wait for heater (§5.5 rule 2)
+                gcode_output += "M109 S" + temp_str(ann.nozzle_temp) + "\n";
+            } else {
+                // Incremental change — non-blocking (§5.5 rule 1)
+                gcode_output += "M104 S" + temp_str(ann.nozzle_temp) + "\n";
+            }
+            m_current_nozzle_temp = ann.nozzle_temp;
+        }
+    }
+
+    // ---- Step 3: Feed-state emission (§7.1, §7.2) ----
+    //
+    // Skip if:
+    //   - Single material, no transition → redundant (§7.1 early return)
+    //   - Feed state unchanged from last emission (§7.2 state tracking)
+
+    if (!ann.is_transition && ann.feed_state.size() <= 1) {
+        // Single-material, non-transition path.
+        // Still update tracking state so layer-boundary reset works,
+        // but don't emit a command — firmware is already in the right state
+        // for single-material regions (§7.1).
+        if (!ann.feed_state.empty())
+            m_current_feed_state = ann.feed_state;
+        return;
+    }
+
+    if (ann.feed_state == m_current_feed_state) {
+        // Feed state unchanged — suppress redundant command (§7.2)
+        return;
+    }
+
+    // ---- Emit MATERIAL_FEED comment (Option A — §5.3) ----
+    //
+    // Uses slot indices for firmware compatibility (§6.2).
+    // Format: ; MATERIAL_FEED S0:0.700000 S1:0.300000
+    //
+    // Also emits the JSON-style comment for debugging/tooling:
+    // ; MATERIAL_FEED {"material_a": 0.7, "material_b": 0.3}
+
+    // Debug-friendly comment with material IDs (human readable)
+    gcode_output += "; MATERIAL_FEED {";
+    {
+        bool first = true;
+        for (const auto &[material_id, fraction] : ann.feed_state) {
+            if (!first) gcode_output += ", ";
+            gcode_output += "\"" + material_id + "\": "
+                          + fraction_str(fraction);
+            first = false;
+        }
+    }
+    gcode_output += "}\n";
+
+    // Slot-indexed command for firmware parsing (§6.2)
+    if (!m_material_to_slot.empty()) {
+        gcode_output += "; MATERIAL_FEED_SLOTS";
+        for (const auto &[material_id, fraction] : ann.feed_state) {
+            auto slot_it = m_material_to_slot.find(material_id);
+            if (slot_it != m_material_to_slot.end()) {
+                gcode_output += " S" + std::to_string(slot_it->second)
+                              + ":" + fraction_str(fraction);
+            } else {
+                // Unknown material — should have been caught during import
+                // validation (§6.3). Emit warning comment and continue
+                // rather than crashing mid-export.
+                gcode_output += " ; WARNING: unknown material_id \""
+                              + material_id + "\"\n";
+            }
+        }
+        gcode_output += "\n";
+    }
+
+    // Transition progress annotation for downstream tools (§2.4)
+    if (ann.is_transition && ann.transition_progress >= 0.0) {
+        gcode_output += "; TRANSITION_PROGRESS "
+                      + fraction_str(ann.transition_progress) + "\n";
+    }
+
+    // Update tracked state (§7.2)
+    m_current_feed_state = ann.feed_state;
+}
 
 
 } // namespace Slic3r
