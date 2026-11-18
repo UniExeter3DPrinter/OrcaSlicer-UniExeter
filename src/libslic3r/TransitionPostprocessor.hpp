@@ -50,6 +50,7 @@ TransitionPostprocessorResult run_transition_postprocessor(
     const std::string  &output_ir_path,
     const std::string  &transition_db_path,
     const std::string  &transition_mode,
+    double              pellet_length,
     int                 timeout_seconds
 );
 

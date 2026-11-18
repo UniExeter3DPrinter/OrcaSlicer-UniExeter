@@ -9016,7 +9016,7 @@ void PrintConfigDef::init_fff_params()
 
     def = this->add("transition_mode", coString);
     def->label    = L("Transition mode");
-    def->tooltip  = L("\"blend\" uses sigmoid blending for smooth material "
+    def->tooltip  = L("\"blend\" uses empirical blend curves blending for smooth material "
                        "transitions. \"purge\" uses traditional purge-tower "
                        "or bucket purging as a fallback.");
     def->category = L("Material Transitions");
@@ -9034,6 +9034,19 @@ void PrintConfigDef::init_fff_params()
     def->max      = 3600;
     def->set_default_value(new ConfigOptionInt(300));
 
+    def = this->add("pellet_length", coFloat);
+    def->label    = L("Pellet length");
+    def->tooltip  = L("Length of each pellet in mm. Pellets are cut from "
+                       "standard 1.75 mm filament feedstock. The transition "
+                       "postprocessor uses this together with the filament "
+                       "diameter to compute the number of discrete pellets "
+                       "required per extrusion segment.");
+    def->category = L("Material Transitions");
+    def->sidetext = L("mm");
+    def->min      = 0.5;
+    def->max      = 100.0;
+    def->mode     = comAdvanced;
+    def->set_default_value(new ConfigOptionFloat(2.0));
 
 }
 

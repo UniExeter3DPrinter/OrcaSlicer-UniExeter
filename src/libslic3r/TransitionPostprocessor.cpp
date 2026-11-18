@@ -36,6 +36,7 @@ TransitionPostprocessorResult run_transition_postprocessor(
     const std::string  &output_ir_path,
     const std::string  &transition_db_path,
     const std::string  &transition_mode,
+    double              pellet_length,
     int                 timeout_seconds)
 {
     TransitionPostprocessorResult result;
@@ -65,10 +66,11 @@ TransitionPostprocessorResult run_transition_postprocessor(
     try {
         bp::child proc(
             postprocessor_path,
-            "--input",    input_ir_path,
-            "--output",   output_ir_path,
-            "--database", transition_db_path,
-            "--mode",     transition_mode,
+            "--input",          input_ir_path,
+            "--output",         output_ir_path,
+            "--database",       transition_db_path,
+            "--mode",           transition_mode,
+            "--pellet-length",  std::to_string(pellet_length),
             bp::std_err > stderr_stream,
             bp::std_out > bp::null
         );
@@ -139,6 +141,8 @@ void run_transition_pipeline(
         config.opt_string("transition_mode");
     const int timeout =
         config.opt_int("transition_postprocessor_timeout");
+    const double pellet_len =
+        config.opt_float("pellet_length");
 
     // ---- Build temp file paths ----
     const std::string ir_export_path =
@@ -159,7 +163,8 @@ void run_transition_pipeline(
     // ---- Step 2: Run postprocessor (§8.4 step 2) ----
     BOOST_LOG_TRIVIAL(info)
         << "Transition pipeline: launching postprocessor "
-        << postprocessor_path;
+        << postprocessor_path
+        << " (pellet_length=" << pellet_len << " mm)";
 
     auto result = run_transition_postprocessor(
         postprocessor_path,
@@ -167,6 +172,7 @@ void run_transition_pipeline(
         ir_import_path,
         database_path,
         mode,
+        pellet_len,
         timeout
     );
 

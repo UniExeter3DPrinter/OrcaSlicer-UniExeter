@@ -4065,19 +4065,25 @@ std::string Print::export_gcode(const std::string& path_template, GCodeProcessor
                 const auto* opt = full_config.option<ConfigOptionInt>(key);
                 return opt ? opt->value : fallback;
             };
+            auto safe_opt_float = [&](const char* key, double fallback) -> double {
+                const auto* opt = full_config.option<ConfigOptionFloat>(key);
+                return opt ? opt->value : fallback;
+            };
 
             // ── Read all transition config values ────────────────────
-            const std::string pp_path    = safe_opt_string("transition_postprocessor_path");
-            const std::string db_path    = safe_opt_string("transition_database_path");
-            const std::string tp_mode    = safe_opt_string("transition_mode");
-            const int         tp_timeout = safe_opt_int("transition_postprocessor_timeout", 120);
+            const std::string pp_path       = safe_opt_string("transition_postprocessor_path");
+            const std::string db_path       = safe_opt_string("transition_database_path");
+            const std::string tp_mode       = safe_opt_string("transition_mode");
+            const int         tp_timeout    = safe_opt_int("transition_postprocessor_timeout", 120);
+            const double      pellet_len    = safe_opt_float("pellet_length", 2.0);
 
             // ── Start timer ──────────────────────────────────────────
             auto pipeline_start = std::chrono::steady_clock::now();
 
             BOOST_LOG_TRIVIAL(info)
                 << "Transition pipeline: enabled"
-                << " (mode=" << (tp_mode.empty() ? "sigmoid" : tp_mode)
+                << " (mode=" << (tp_mode.empty() ? "blend" : tp_mode)
+                << ", pellet_length=" << pellet_len << " mm"
                 << ", path=" << (pp_path.empty() ? "none" : pp_path) << ")";
 
             std::string temp_dir = boost::filesystem::path(path)
@@ -4137,7 +4143,8 @@ std::string Print::export_gcode(const std::string& path_template, GCodeProcessor
 
                 BOOST_LOG_TRIVIAL(info)
                     << "Transition pipeline: invoking " << pp_path
-                    << " (timeout=" << tp_timeout << "s)";
+                    << " (timeout=" << tp_timeout << "s"
+                    << ", pellet_length=" << pellet_len << " mm)";
 
                 MaterialAnnotationMap material_annotations;
                 run_transition_pipeline(
@@ -4192,6 +4199,7 @@ std::string Print::export_gcode(const std::string& path_template, GCodeProcessor
     }
     return path.c_str();
 }
+
 
 void Print::_make_skirt()
 {

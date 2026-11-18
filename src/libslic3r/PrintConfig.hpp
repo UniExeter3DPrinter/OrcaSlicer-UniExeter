@@ -138,7 +138,7 @@ enum InfillPattern : int {
 };
 
 enum class TransitionMode : uint8_t {
-    Blend,      // Sigmoid blending — the novel contribution (§9.2)
+    Blend,      // Empirical material blend curves
     Purge       // Traditional purge-tower/bucket fallback
 };
 
@@ -2200,6 +2200,13 @@ PRINT_CONFIG_CLASS_DERIVED_DEFINE(
     ((ConfigOptionPoint,               bed_mesh_probe_distance))
     ((ConfigOptionFloat,               adaptive_bed_mesh_margin))
 
+    // ---- Material Transition Postprocessor (Spec: ORCASLICER_IR_PLUGIN.md §9.1) ----
+    ((ConfigOptionBool,                transition_postprocessor_enabled))
+    ((ConfigOptionString,              transition_postprocessor_path))
+    ((ConfigOptionString,              transition_database_path))
+    ((ConfigOptionString,              transition_mode))
+    ((ConfigOptionInt,                 transition_postprocessor_timeout))
+    ((ConfigOptionFloat,               pellet_length))
 
 )
 
