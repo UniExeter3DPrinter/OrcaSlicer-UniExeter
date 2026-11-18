@@ -16,6 +16,9 @@
 #include <boost/process.hpp>
 #include <boost/filesystem.hpp>
 #include <boost/log/trivial.hpp>
+#ifdef _WIN32
+#include <boost/process/windows.hpp>
+#endif
 
 #include <chrono>
 #include <sstream>
@@ -58,22 +61,64 @@ TransitionPostprocessorResult run_transition_postprocessor(
         return result;
     }
 
-    // ---- Build command line (§8.3) ----
-    bp::ipstream stderr_stream;
+    // ---- Detect .py scripts that need the Python interpreter ----
+    // The production postprocessor is a native executable, but during
+    // development a Python stub may be used.  boost::process passes
+    // postprocessor_path as lpApplicationName to CreateProcess(), which
+    // only executes PE binaries (.exe/.com).
+    //
+    // We build a single command string and launch via bp::shell (i.e.
+    // cmd.exe /c) so that PATH resolution, .py association, and .bat
+    // execution all work natively.  We intentionally avoid
+    // bp::search_path to prevent pulling in extra Boost DLL dependencies
+    // that may not be present in the build tree.
 
+    const bool is_python_script =
+        postprocessor_path.size() >= 3
+        && postprocessor_path.compare(
+               postprocessor_path.size() - 3, 3, ".py") == 0;
+
+    // ---- Build command string ----
+    std::string cmd_line;
+    if (is_python_script) {
+        BOOST_LOG_TRIVIAL(info)
+            << "Transition postprocessor: detected .py script, "
+               "launching via python interpreter";
+        cmd_line = "python \"" + postprocessor_path + "\"";
+    } else {
+        cmd_line = "\"" + postprocessor_path + "\"";
+    }
+
+    cmd_line += " --input \""          + input_ir_path      + "\"";
+    cmd_line += " --output \""         + output_ir_path     + "\"";
+    cmd_line += " --database \""       + transition_db_path + "\"";
+    cmd_line += " --mode "             + transition_mode;
+    cmd_line += " --pellet-length "    + std::to_string(pellet_length);
+
+    BOOST_LOG_TRIVIAL(info)
+        << "Transition postprocessor: command: " << cmd_line;
+
+    // ---- Launch via shell (§8.3) ----
+    bp::ipstream stderr_stream;
     auto start = std::chrono::steady_clock::now();
 
     try {
+#ifdef _WIN32
         bp::child proc(
-            postprocessor_path,
-            "--input",          input_ir_path,
-            "--output",         output_ir_path,
-            "--database",       transition_db_path,
-            "--mode",           transition_mode,
-            "--pellet-length",  std::to_string(pellet_length),
+            cmd_line,
+            bp::shell,
+            ::boost::process::windows::create_no_window,
             bp::std_err > stderr_stream,
             bp::std_out > bp::null
         );
+#else
+        bp::child proc(
+            cmd_line,
+            bp::shell,
+            bp::std_err > stderr_stream,
+            bp::std_out > bp::null
+        );
+#endif
 
         // ---- Wait with timeout (§8.5 row 3) ----
         if (timeout_seconds > 0) {
