@@ -100,6 +100,7 @@ TransitionPostprocessorResult run_transition_postprocessor(
 
     // ---- Launch via shell (§8.3) ----
     bp::ipstream stderr_stream;
+    bp::ipstream stdout_stream;
     auto start = std::chrono::steady_clock::now();
 
     try {
@@ -109,14 +110,14 @@ TransitionPostprocessorResult run_transition_postprocessor(
             bp::shell,
             ::boost::process::windows::create_no_window,
             bp::std_err > stderr_stream,
-            bp::std_out > bp::null
+            bp::std_out > stdout_stream
         );
 #else
         bp::child proc(
             cmd_line,
             bp::shell,
             bp::std_err > stderr_stream,
-            bp::std_out > bp::null
+            bp::std_out > stdout_stream
         );
 #endif
 
@@ -138,6 +139,18 @@ TransitionPostprocessorResult run_transition_postprocessor(
             }
         } else {
             proc.wait();
+        }
+
+        // ---- Relay postprocessor stdout to BOOST_LOG ----
+        {
+            std::string line;
+            while (std::getline(stdout_stream, line)) {
+                // Strip trailing \r on Windows
+                if (!line.empty() && line.back() == '\r')
+                    line.pop_back();
+                if (!line.empty())
+                    BOOST_LOG_TRIVIAL(info) << line;
+            }
         }
 
         auto end = std::chrono::steady_clock::now();
@@ -263,7 +276,12 @@ void run_transition_pipeline(
         << annotations_out.size() << " material annotations";
 
     // ---- Step 5: Cleanup temp files (§8.4 step 4) ----
+    BOOST_LOG_TRIVIAL(info)
+        << "Transition pipeline: cleanup — removing " << ir_export_path;
     bf::remove(ir_export_path);
+
+    BOOST_LOG_TRIVIAL(info)
+        << "Transition pipeline: cleanup — removing " << ir_import_path;
     bf::remove(ir_import_path);
 }
 
