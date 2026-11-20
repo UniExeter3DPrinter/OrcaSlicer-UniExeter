@@ -49,8 +49,11 @@ TransitionPostprocessorResult run_transition_postprocessor(
     const std::string  &input_ir_path,
     const std::string  &output_ir_path,
     const std::string  &transition_db_path,
-    const std::string  &transition_mode,
+    const std::string  &sidecar_path,
     double              pellet_length,
+    double              bed_width,
+    double              bed_depth,
+    const std::string  &transition_mode,
     int                 timeout_seconds
 );
 

@@ -2204,9 +2204,12 @@ PRINT_CONFIG_CLASS_DERIVED_DEFINE(
     ((ConfigOptionBool,                transition_postprocessor_enabled))
     ((ConfigOptionString,              transition_postprocessor_path))
     ((ConfigOptionString,              transition_database_path))
+    ((ConfigOptionString,              transition_sidecar_path))
+    ((ConfigOptionFloat,               transition_pellet_length))
+    ((ConfigOptionFloat,               transition_bed_width))
+    ((ConfigOptionFloat,               transition_bed_depth))
     ((ConfigOptionString,              transition_mode))
     ((ConfigOptionInt,                 transition_postprocessor_timeout))
-    ((ConfigOptionFloat,               pellet_length))
 
 )
 

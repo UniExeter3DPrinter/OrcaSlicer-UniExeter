@@ -38,8 +38,11 @@ TransitionPostprocessorResult run_transition_postprocessor(
     const std::string  &input_ir_path,
     const std::string  &output_ir_path,
     const std::string  &transition_db_path,
-    const std::string  &transition_mode,
+    const std::string  &sidecar_path,
     double              pellet_length,
+    double              bed_width,
+    double              bed_depth,
+    const std::string  &transition_mode,
     int                 timeout_seconds)
 {
     TransitionPostprocessorResult result;
@@ -92,8 +95,10 @@ TransitionPostprocessorResult run_transition_postprocessor(
     cmd_line += " --input \""          + input_ir_path      + "\"";
     cmd_line += " --output \""         + output_ir_path     + "\"";
     cmd_line += " --database \""       + transition_db_path + "\"";
-    cmd_line += " --mode "             + transition_mode;
+    cmd_line += " --sidecar \""        + sidecar_path + "\"";
     cmd_line += " --pellet-length "    + std::to_string(pellet_length);
+    cmd_line += " --bed_size "         + std::to_string(bed_width) + "," + std::to_string(bed_depth);
+    cmd_line += " --mode "             + transition_mode;
 
     BOOST_LOG_TRIVIAL(info)
         << "Transition postprocessor: command: " << cmd_line;
@@ -195,12 +200,18 @@ void run_transition_pipeline(
         config.opt_string("transition_postprocessor_path");
     const std::string database_path =
         config.opt_string("transition_database_path");
+    const std::string sidecar_path =
+        config.opt_string("transition_sidecar_path");
+    const double pellet_len =
+        config.opt_float("transition_pellet_length");
+    const double bed_width =
+        config.opt_float("transition_bed_width");
+    const double bed_depth =
+        config.opt_float("transition_bed_depth");
     const std::string mode =
         config.opt_string("transition_mode");
     const int timeout =
         config.opt_int("transition_postprocessor_timeout");
-    const double pellet_len =
-        config.opt_float("pellet_length");
 
     // ---- Build temp file paths ----
     const std::string ir_export_path =
@@ -222,15 +233,18 @@ void run_transition_pipeline(
     BOOST_LOG_TRIVIAL(info)
         << "Transition pipeline: launching postprocessor "
         << postprocessor_path
-        << " (pellet_length=" << pellet_len << " mm)";
+        << " (pellet_length=" << pellet_len << " mm, bed_width=" << bed_width << " mm, bed_depth=" << bed_depth << " mm)";
 
     auto result = run_transition_postprocessor(
         postprocessor_path,
         ir_export_path,
         ir_import_path,
         database_path,
-        mode,
+        sidecar_path,
         pellet_len,
+        bed_width,
+        bed_depth,
+        mode,
         timeout
     );
 
