@@ -97,7 +97,7 @@ TransitionPostprocessorResult run_transition_postprocessor(
     cmd_line += " --database \""       + transition_db_path + "\"";
     cmd_line += " --sidecar \""        + sidecar_path + "\"";
     cmd_line += " --pellet-length "    + std::to_string(pellet_length);
-    cmd_line += " --bed_size "         + std::to_string(bed_width) + "," + std::to_string(bed_depth);
+    cmd_line += " --bed-size "         + std::to_string(bed_width) + "," + std::to_string(bed_depth);
     cmd_line += " --mode "             + transition_mode;
 
     BOOST_LOG_TRIVIAL(info)
