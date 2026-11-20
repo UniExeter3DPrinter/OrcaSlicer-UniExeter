@@ -185,8 +185,6 @@ TransitionPostprocessorResult run_transition_postprocessor(
 
 // =========================================================================
 // run_transition_pipeline (§8.4)
-//
-// CORRECTED: reads config via DynamicPrintConfig::opt_string() etc.
 // =========================================================================
 
 void run_transition_pipeline(
@@ -195,23 +193,28 @@ void run_transition_pipeline(
     const std::string              &temp_dir,
     MaterialAnnotationMap          &annotations_out)
 {
-    // ---- Read config keys via runtime accessors ----
-    const std::string postprocessor_path =
-        config.opt_string("transition_postprocessor_path");
-    const std::string database_path =
-        config.opt_string("transition_database_path");
-    const std::string sidecar_path =
-        config.opt_string("transition_sidecar_path");
-    const double pellet_len =
-        config.opt_float("transition_pellet_length");
-    const double bed_width =
-        config.opt_float("transition_bed_width");
-    const double bed_depth =
-        config.opt_float("transition_bed_depth");
-    const std::string mode =
-        config.opt_string("transition_mode");
-    const int timeout =
-        config.opt_int("transition_postprocessor_timeout");
+    // ---- Read config keys via safe accessors ----
+    auto safe_opt_string = [&](const char* key) -> std::string {
+        const auto* opt = config.option<ConfigOptionString>(key);
+        return opt ? opt->value : std::string();
+    };
+    auto safe_opt_float = [&](const char* key, double fallback) -> double {
+        const auto* opt = config.option<ConfigOptionFloat>(key);
+        return opt ? opt->value : fallback;
+    };
+    auto safe_opt_int = [&](const char* key, int fallback) -> int {
+        const auto* opt = config.option<ConfigOptionInt>(key);
+        return opt ? opt->value : fallback;
+    };
+
+    const std::string postprocessor_path = safe_opt_string("transition_postprocessor_path");
+    const std::string database_path = safe_opt_string("transition_database_path");
+    const std::string sidecar_path = safe_opt_string("transition_sidecar_path");
+    const double pellet_len = safe_opt_float("transition_pellet_length", 2.0);
+    const double bed_width = safe_opt_float("transition_bed_width", 250.0);
+    const double bed_depth = safe_opt_float("transition_bed_depth", 250.0);
+    const std::string mode = safe_opt_string("transition_mode");
+    const int timeout = safe_opt_int("transition_postprocessor_timeout", 30);
 
     // ---- Build temp file paths ----
     const std::string ir_export_path =
