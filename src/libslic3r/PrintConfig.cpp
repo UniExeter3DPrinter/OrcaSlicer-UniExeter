@@ -9014,6 +9014,51 @@ void PrintConfigDef::init_fff_params()
     def->mode     = comAdvanced;
     def->set_default_value(new ConfigOptionString(""));
 
+    def = this->add("transition_sidecar_path", coString);
+    def->label    = L("Geometry sidecar path");
+    def->tooltip  = L("Absolute path to the material geometry sidecar JSON "
+                       "file. Provides per-volume vertex/face data to the "
+                       "transition postprocessor.");
+    def->category = L("Material Transitions");
+    def->mode     = comAdvanced;
+    def->set_default_value(new ConfigOptionString(""));
+
+    def = this->add("transition_pellet_length", coFloat);
+    def->label    = L("Pellet length");
+    def->tooltip  = L("Length of each pellet in mm. Pellets are cut from "
+                       "standard 1.75 mm filament feedstock. The transition "
+                       "postprocessor uses this together with the filament "
+                       "diameter to compute the number of discrete pellets "
+                       "required per extrusion segment.");
+    def->category = L("Material Transitions");
+    def->sidetext = L("mm");
+    def->min      = 0.5;
+    def->max      = 100.0;
+    def->mode     = comAdvanced;
+    def->set_default_value(new ConfigOptionFloat(2.0));
+
+    def = this->add("transition_bed_width", coFloat);
+    def->label    = L("Bed width");
+    def->tooltip  = L("Print bed width in mm. Passed to the transition "
+                       "postprocessor for coordinate-space validation.");
+    def->category = L("Material Transitions");
+    def->sidetext = L("mm");
+    def->min      = 1.0;
+    def->max      = 2000.0;
+    def->mode     = comAdvanced;
+    def->set_default_value(new ConfigOptionFloat(250.0));
+
+    def = this->add("transition_bed_depth", coFloat);
+    def->label    = L("Bed depth");
+    def->tooltip  = L("Print bed depth in mm. Passed to the transition "
+                       "postprocessor for coordinate-space validation.");
+    def->category = L("Material Transitions");
+    def->sidetext = L("mm");
+    def->min      = 1.0;
+    def->max      = 2000.0;
+    def->mode     = comAdvanced;
+    def->set_default_value(new ConfigOptionFloat(250.0));
+
     def = this->add("transition_mode", coString);
     def->label    = L("Transition mode");
     def->tooltip  = L("\"blend\" uses empirical blend curves blending for smooth material "
@@ -9033,20 +9078,6 @@ void PrintConfigDef::init_fff_params()
     def->min      = 10;
     def->max      = 3600;
     def->set_default_value(new ConfigOptionInt(300));
-
-    def = this->add("pellet_length", coFloat);
-    def->label    = L("Pellet length");
-    def->tooltip  = L("Length of each pellet in mm. Pellets are cut from "
-                       "standard 1.75 mm filament feedstock. The transition "
-                       "postprocessor uses this together with the filament "
-                       "diameter to compute the number of discrete pellets "
-                       "required per extrusion segment.");
-    def->category = L("Material Transitions");
-    def->sidetext = L("mm");
-    def->min      = 0.5;
-    def->max      = 100.0;
-    def->mode     = comAdvanced;
-    def->set_default_value(new ConfigOptionFloat(2.0));
 
 }
 
