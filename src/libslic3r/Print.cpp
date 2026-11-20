@@ -4081,13 +4081,20 @@ std::string Print::export_gcode(const std::string& path_template, GCodeProcessor
 
             BOOST_LOG_TRIVIAL(info)
                 << "Transition pipeline: enabled"
-                << " (mode=" << (tp_mode.empty() ? "blend" : tp_mode)
+                << " (mode=" << (tp_mode.empty() ? "<none>" : tp_mode)
                 << ", pellet_length=" << pellet_len << " mm"
                 << ", bed_width=" << bed_width << " mm"
                 << ", bed_depth=" << bed_depth << " mm"
-                << ", pp_path=" << (pp_path.empty() ? "none" : pp_path)
-                << ", db_path=" << (db_path.empty() ? "none" : db_path)
-                << ", sc_path=" << (sc_path.empty() ? "none" : sc_path) << ")";
+                << ")";
+            BOOST_LOG_TRIVIAL(info)
+                << "Transition pipeline: "
+                << "pp_path=" << (pp_path.empty() ? "<none>" : pp_path);
+            BOOST_LOG_TRIVIAL(info)
+                << "Transition pipeline: "
+                << "db_path=" << (db_path.empty() ? "<none>" : db_path);
+            BOOST_LOG_TRIVIAL(info)
+                << "Transition pipeline: "
+                << "sc_path=" << (sc_path.empty() ? "<none>" : sc_path);
 
             std::string temp_dir = boost::filesystem::path(path)
                 .parent_path().string();
